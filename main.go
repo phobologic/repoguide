@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 
 	sitter "github.com/smacker/go-tree-sitter"
@@ -38,7 +39,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 
 	var (
 		maxFiles    int
-		language    string
+		langs       string
 		cachePath   string
 		maxFileSize int
 		showVersion bool
@@ -46,8 +47,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 
 	fs.IntVar(&maxFiles, "n", 0, "maximum number of files to include")
 	fs.IntVar(&maxFiles, "max-files", 0, "maximum number of files to include")
-	fs.StringVar(&language, "l", "", "restrict to a specific language")
-	fs.StringVar(&language, "language", "", "restrict to a specific language")
+	fs.StringVar(&langs, "l", "", "comma-separated languages to include")
+	fs.StringVar(&langs, "langs", "", "comma-separated languages to include")
 	fs.StringVar(&cachePath, "cache", "", "cache file path")
 	fs.IntVar(&maxFileSize, "max-file-size", defaultMaxFileSize, "skip files larger than this many bytes")
 	fs.BoolVar(&showVersion, "V", false, "show version and exit")
@@ -80,14 +81,19 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return fmt.Errorf("%s: not a directory", root)
 	}
 
-	if language != "" {
-		if _, ok := lang.Languages[language]; !ok {
-			return fmt.Errorf("unsupported language %q", language)
+	var langFilter []string
+	if langs != "" {
+		for _, name := range strings.Split(langs, ",") {
+			name = strings.TrimSpace(name)
+			if _, ok := lang.Languages[name]; !ok {
+				return fmt.Errorf("unsupported language %q", name)
+			}
+			langFilter = append(langFilter, name)
 		}
 	}
 
 	// Discover files
-	files, err := discover.Files(root, language)
+	files, err := discover.Files(root, langFilter)
 	if err != nil {
 		return fmt.Errorf("discovering files: %w", err)
 	}
@@ -218,7 +224,7 @@ func parseFilesConcurrent(root string, files []discover.FileEntry, stderr io.Wri
 						stderrMu.Unlock()
 						continue
 					}
-					pp = &parserPair{parser: l.NewParser(), query: q}
+					pp = &parserPair{lang: l, parser: l.NewParser(), query: q}
 					parsers[f.Language] = pp
 				}
 
@@ -231,7 +237,7 @@ func parseFilesConcurrent(root string, files []discover.FileEntry, stderr io.Wri
 					continue
 				}
 
-				tags := parse.ExtractTags(pp.parser, pp.query, source, f.Path)
+				tags := parse.ExtractTags(pp.lang, pp.parser, pp.query, source, f.Path)
 				results <- result{
 					index: idx,
 					info: model.FileInfo{
@@ -274,6 +280,7 @@ func parseFilesConcurrent(root string, files []discover.FileEntry, stderr io.Wri
 }
 
 type parserPair struct {
+	lang   *lang.Language
 	parser *sitter.Parser
 	query  *sitter.Query
 }
@@ -283,7 +290,7 @@ var flagsWithValue = map[string]bool{
 	"-n": true, "--n": true,
 	"-max-files": true, "--max-files": true,
 	"-l": true, "--l": true,
-	"-language": true, "--language": true,
+	"-langs": true, "--langs": true,
 	"-cache": true, "--cache": true,
 	"-max-file-size": true, "--max-file-size": true,
 }

@@ -19,7 +19,7 @@ func TestDiscoverPythonFiles(t *testing.T) {
 	// Hidden file should be ignored
 	writeFile(t, dir, ".hidden.py", "secret")
 
-	entries, err := Files(dir, "")
+	entries, err := Files(dir, nil)
 	if err != nil {
 		t.Fatalf("Files: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestDiscoverSkipDirs(t *testing.T) {
 	writeFile(t, dir, "__pycache__/cached.py", "pass")
 	writeFile(t, dir, ".hidden/secret.py", "pass")
 
-	entries, err := Files(dir, "")
+	entries, err := Files(dir, nil)
 	if err != nil {
 		t.Fatalf("Files: %v", err)
 	}
@@ -79,7 +79,7 @@ func TestDiscoverLanguageFilter(t *testing.T) {
 	writeFile(t, dir, "main.py", "pass")
 	writeFile(t, dir, "lib.py", "pass")
 
-	entries, err := Files(dir, "python")
+	entries, err := Files(dir, []string{"python"})
 	if err != nil {
 		t.Fatalf("Files: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestDiscoverLanguageFilter(t *testing.T) {
 		t.Fatalf("expected 2 entries for python filter, got %d", len(entries))
 	}
 
-	entries, err = Files(dir, "javascript")
+	entries, err = Files(dir, []string{"javascript"})
 	if err != nil {
 		t.Fatalf("Files: %v", err)
 	}
@@ -108,7 +108,7 @@ func TestDiscoverSymlinksSkipped(t *testing.T) {
 		t.Skip("symlinks not supported")
 	}
 
-	entries, err := Files(dir, "")
+	entries, err := Files(dir, nil)
 	if err != nil {
 		t.Fatalf("Files: %v", err)
 	}

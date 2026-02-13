@@ -5,14 +5,19 @@ package lang
 import (
 	"embed"
 	"fmt"
+	"regexp"
+	"strings"
 	"sync"
 
 	sitter "github.com/smacker/go-tree-sitter"
-	"github.com/smacker/go-tree-sitter/python"
+
+	"github.com/phobologic/repoguide/internal/model"
 )
 
 //go:embed queries/*.scm
 var queryFS embed.FS
+
+var whitespaceRe = regexp.MustCompile(`\s+`)
 
 // Language holds tree-sitter configuration for a supported language.
 type Language struct {
@@ -22,6 +27,17 @@ type Language struct {
 	queryOnce  sync.Once
 	query      *sitter.Query
 	queryErr   error
+
+	// FindMethodClass returns the enclosing class name if a @definition.function
+	// is actually a method (Python/Ruby style). Returns "" if not a method.
+	FindMethodClass func(node *sitter.Node, source []byte) string
+
+	// FindReceiverType returns the receiver type name for a @definition.method
+	// node (Go style). Returns "" if not applicable.
+	FindReceiverType func(node *sitter.Node, source []byte) string
+
+	// ExtractSignature returns a signature string for a definition node.
+	ExtractSignature func(node *sitter.Node, kind model.SymbolKind, source []byte) string
 }
 
 // GetLanguage returns the tree-sitter Language pointer.
@@ -56,28 +72,36 @@ func (l *Language) GetTagQuery() (*sitter.Query, error) {
 }
 
 // Languages maps language names to their configuration.
-var Languages = map[string]*Language{
-	"python": {
-		Name:       "python",
-		Extensions: []string{".py"},
-		lang:       python.GetLanguage(),
-	},
-}
+// Populated by init() functions in per-language files.
+var Languages = map[string]*Language{}
 
-// extensionMap maps file extensions to language names.
-var extensionMap = buildExtensionMap()
+// extensionMap is built lazily after all init() functions have run.
+var extensionMap map[string]string
+var extensionOnce sync.Once
 
-func buildExtensionMap() map[string]string {
-	m := make(map[string]string)
-	for _, l := range Languages {
-		for _, ext := range l.Extensions {
-			m[ext] = l.Name
+func getExtensionMap() map[string]string {
+	extensionOnce.Do(func() {
+		extensionMap = make(map[string]string)
+		for _, l := range Languages {
+			for _, ext := range l.Extensions {
+				extensionMap[ext] = l.Name
+			}
 		}
-	}
-	return m
+	})
+	return extensionMap
 }
 
 // ForExtension returns the language name for a file extension, or "" if unsupported.
 func ForExtension(ext string) string {
-	return extensionMap[ext]
+	return getExtensionMap()[ext]
+}
+
+// NodeText returns the source text of a tree-sitter node.
+func NodeText(node *sitter.Node, source []byte) string {
+	return string(source[node.StartByte():node.EndByte()])
+}
+
+// CollapseWhitespace replaces runs of whitespace with a single space and trims.
+func CollapseWhitespace(s string) string {
+	return strings.TrimSpace(whitespaceRe.ReplaceAllString(s, " "))
 }

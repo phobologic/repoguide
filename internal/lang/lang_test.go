@@ -12,7 +12,8 @@ func TestForExtension(t *testing.T) {
 		want string
 	}{
 		{".py", "python"},
-		{".go", ""},
+		{".go", "go"},
+		{".rb", "ruby"},
 		{".js", ""},
 		{"", ""},
 	}
@@ -31,34 +32,47 @@ func TestForExtension(t *testing.T) {
 func TestLanguagesRegistered(t *testing.T) {
 	t.Parallel()
 
-	py, ok := Languages["python"]
-	if !ok {
-		t.Fatal("python language not registered")
-	}
-	if py.GetLanguage() == nil {
-		t.Error("python language is nil")
+	for _, name := range []string{"python", "go", "ruby"} {
+		l, ok := Languages[name]
+		if !ok {
+			t.Errorf("%s language not registered", name)
+			continue
+		}
+		if l.GetLanguage() == nil {
+			t.Errorf("%s language is nil", name)
+		}
 	}
 }
 
 func TestNewParser(t *testing.T) {
 	t.Parallel()
 
-	py := Languages["python"]
-	p := py.NewParser()
-	if p == nil {
-		t.Fatal("NewParser returned nil")
+	for _, name := range []string{"python", "go", "ruby"} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			l := Languages[name]
+			p := l.NewParser()
+			if p == nil {
+				t.Fatalf("NewParser returned nil for %s", name)
+			}
+		})
 	}
 }
 
 func TestGetTagQuery(t *testing.T) {
 	t.Parallel()
 
-	py := Languages["python"]
-	q, err := py.GetTagQuery()
-	if err != nil {
-		t.Fatalf("GetTagQuery: %v", err)
-	}
-	if q == nil {
-		t.Fatal("query is nil")
+	for _, name := range []string{"python", "go", "ruby"} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			l := Languages[name]
+			q, err := l.GetTagQuery()
+			if err != nil {
+				t.Fatalf("GetTagQuery for %s: %v", name, err)
+			}
+			if q == nil {
+				t.Fatalf("query is nil for %s", name)
+			}
+		})
 	}
 }

@@ -237,6 +237,7 @@ func TestReorderArgs(t *testing.T) {
 		{"flags first", []string{"-n", "5", "."}, []string{"-n", "5", "."}},
 		{"positional first", []string{".", "-n", "5"}, []string{"-n", "5", "."}},
 		{"mixed", []string{"-l", "python", ".", "-n", "5"}, []string{"-l", "python", "-n", "5", "."}},
+		{"multi-lang", []string{"-l", "go,ruby", "."}, []string{"-l", "go,ruby", "."}},
 		{"no flags", []string{"."}, []string{"."}},
 		{"no args", nil, nil},
 		{"bool flag", []string{"-V"}, []string{"-V"}},

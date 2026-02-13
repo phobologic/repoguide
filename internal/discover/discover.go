@@ -41,8 +41,12 @@ var skipDirs = map[string]struct{}{
 }
 
 // Files discovers parseable source files under root.
-// If languageFilter is non-empty, only files of that language are returned.
-func Files(root string, languageFilter string) ([]FileEntry, error) {
+// If languages is non-empty, only files matching one of the listed languages are returned.
+func Files(root string, languages []string) ([]FileEntry, error) {
+	langSet := make(map[string]struct{}, len(languages))
+	for _, l := range languages {
+		langSet[l] = struct{}{}
+	}
 	gitFiles := gitLsFiles(root)
 	var gi *ignore.GitIgnore
 	if gitFiles == nil {
@@ -96,8 +100,10 @@ func Files(root string, languageFilter string) ([]FileEntry, error) {
 			return nil
 		}
 
-		if languageFilter != "" && langName != languageFilter {
-			return nil
+		if len(langSet) > 0 {
+			if _, ok := langSet[langName]; !ok {
+				return nil
+			}
 		}
 
 		results = append(results, FileEntry{Path: rel, Language: langName})
