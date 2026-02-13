@@ -12,7 +12,7 @@ Written in Go for fast parallel parsing across CPU cores.
 
 ## Installation
 
-Requires Go 1.25+ and a C compiler (for tree-sitter CGo bindings).
+Requires Go 1.24+ and a C compiler (for tree-sitter CGo bindings).
 
 ```
 go install github.com/phobologic/repoguide@latest
@@ -42,7 +42,7 @@ repoguide [ROOT] [OPTIONS]
 |---|---|
 | `ROOT` | Repository root directory (default: `.`) |
 | `--max-files`, `-n` | Limit output to top N files by PageRank (min: 1) |
-| `--language`, `-l` | Restrict to a specific language (e.g., `python`) |
+| `--langs`, `-l` | Comma-separated languages to include (e.g., `python,go`) |
 | `--cache` | Cache file path; reuses if newer than all source files |
 | `--max-file-size` | Skip files larger than this many bytes (default: 1MB) |
 | `--version`, `-V` | Show version and exit |
@@ -115,7 +115,7 @@ Parsing runs concurrently across all available CPU cores.
 
 ## Supported languages
 
-Python. Extensible by adding a tree-sitter grammar and a `.scm` query file to `internal/lang/queries/`.
+Python, Go, Ruby. Extensible by adding a tree-sitter grammar and a `.scm` query file to `internal/lang/queries/`.
 
 ## Development
 
