@@ -46,6 +46,9 @@ func TestRunBasic(t *testing.T) {
 	}
 
 	out := stdout.String()
+	if !strings.Contains(out, "# Repository Map") {
+		t.Error("missing agent context header")
+	}
 	if !strings.Contains(out, "repo:") {
 		t.Error("missing repo: header")
 	}
@@ -57,6 +60,25 @@ func TestRunBasic(t *testing.T) {
 	}
 	if !strings.Contains(out, "main.py") {
 		t.Error("missing main.py")
+	}
+}
+
+func TestRunRaw(t *testing.T) {
+	t.Parallel()
+	dir := createSampleRepo(t)
+
+	var stdout, stderr bytes.Buffer
+	err := run([]string{"--raw", dir}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run: %v\nstderr: %s", err, stderr.String())
+	}
+
+	out := stdout.String()
+	if strings.Contains(out, "# Repository Map") {
+		t.Error("--raw should suppress agent context header")
+	}
+	if !strings.HasPrefix(out, "repo:") {
+		t.Errorf("--raw output should start with repo:, got:\n%s", out)
 	}
 }
 
@@ -133,16 +155,56 @@ func TestRunCache(t *testing.T) {
 		t.Fatalf("cache not created: %v", err)
 	}
 
-	// Second run should use cache
+	// Cache file should contain raw TOON (no header)
+	cacheData, err := os.ReadFile(cachePath)
+	if err != nil {
+		t.Fatalf("reading cache: %v", err)
+	}
+	if strings.Contains(string(cacheData), "# Repository Map") {
+		t.Error("cache file should not contain agent header")
+	}
+
+	// Second run should use cache and include header
 	var stdout2, stderr2 bytes.Buffer
 	err = run([]string{"--cache", cachePath, dir}, &stdout2, &stderr2)
 	if err != nil {
 		t.Fatalf("second run: %v", err)
 	}
 
-	// Output should be the same (cache has trailing newline, stdout has trailing newline from Fprintln)
 	if stdout1.String() != stdout2.String() {
 		t.Errorf("cache mismatch:\nfirst:\n%s\nsecond:\n%s", stdout1.String(), stdout2.String())
+	}
+
+	if !strings.Contains(stdout2.String(), "# Repository Map") {
+		t.Error("cached output should include agent header")
+	}
+}
+
+func TestRunCacheRaw(t *testing.T) {
+	t.Parallel()
+	dir := createSampleRepo(t)
+	cachePath := filepath.Join(t.TempDir(), "test.cache")
+
+	// First run populates cache (with header in output)
+	var stdout1, stderr1 bytes.Buffer
+	err := run([]string{"--cache", cachePath, dir}, &stdout1, &stderr1)
+	if err != nil {
+		t.Fatalf("first run: %v", err)
+	}
+
+	// Second run with --raw should use cache but suppress header
+	var stdout2, stderr2 bytes.Buffer
+	err = run([]string{"--raw", "--cache", cachePath, dir}, &stdout2, &stderr2)
+	if err != nil {
+		t.Fatalf("second run: %v", err)
+	}
+
+	out := stdout2.String()
+	if strings.Contains(out, "# Repository Map") {
+		t.Error("--raw with cache should suppress agent header")
+	}
+	if !strings.HasPrefix(out, "repo:") {
+		t.Errorf("--raw cached output should start with repo:, got:\n%s", out)
 	}
 }
 

@@ -43,6 +43,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 		cachePath   string
 		maxFileSize int
 		showVersion bool
+		raw         bool
 	)
 
 	fs.IntVar(&maxFiles, "n", 0, "maximum number of files to include")
@@ -53,6 +54,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	fs.IntVar(&maxFileSize, "max-file-size", defaultMaxFileSize, "skip files larger than this many bytes")
 	fs.BoolVar(&showVersion, "V", false, "show version and exit")
 	fs.BoolVar(&showVersion, "version", false, "show version and exit")
+	fs.BoolVar(&raw, "raw", false, "output raw TOON without agent context header")
 
 	if err := fs.Parse(reorderArgs(args)); err != nil {
 		return err
@@ -105,7 +107,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	if cachePath != "" && cacheIsFresh(cachePath, root, files) {
 		data, err := os.ReadFile(cachePath)
 		if err == nil {
-			_, _ = stdout.Write(data)
+			writeOutput(stdout, strings.TrimRight(string(data), "\n"), raw)
 			return nil
 		}
 	}
@@ -146,7 +148,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 		_ = os.WriteFile(cachePath, []byte(output+"\n"), 0o644)
 	}
 
-	_, _ = fmt.Fprintln(stdout, output)
+	writeOutput(stdout, output, raw)
 	return nil
 }
 
