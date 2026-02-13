@@ -59,7 +59,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	}
 
 	if showVersion {
-		fmt.Fprintf(stdout, "repoguide %s\n", version)
+		_, _ = fmt.Fprintf(stdout, "repoguide %s\n", version)
 		return nil
 	}
 
@@ -146,7 +146,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 		_ = os.WriteFile(cachePath, []byte(output+"\n"), 0o644)
 	}
 
-	fmt.Fprintln(stdout, output)
+	_, _ = fmt.Fprintln(stdout, output)
 	return nil
 }
 
@@ -178,7 +178,7 @@ func filterBySize(root string, files []discover.FileEntry, maxSize int, stderr i
 			continue
 		}
 		if fi.Size() > int64(maxSize) {
-			fmt.Fprintf(stderr, "Warning: %s: skipped (>%d bytes)\n", f.Path, maxSize)
+			_, _ = fmt.Fprintf(stderr, "Warning: %s: skipped (>%d bytes)\n", f.Path, maxSize)
 			continue
 		}
 		kept = append(kept, f)
@@ -220,7 +220,7 @@ func parseFilesConcurrent(root string, files []discover.FileEntry, stderr io.Wri
 					q, err := l.GetTagQuery()
 					if err != nil {
 						stderrMu.Lock()
-						fmt.Fprintf(stderr, "Warning: failed to compile query for %s: %v\n", f.Language, err)
+						_, _ = fmt.Fprintf(stderr, "Warning: failed to compile query for %s: %v\n", f.Language, err)
 						stderrMu.Unlock()
 						continue
 					}
@@ -232,7 +232,7 @@ func parseFilesConcurrent(root string, files []discover.FileEntry, stderr io.Wri
 				source, err := os.ReadFile(absPath)
 				if err != nil {
 					stderrMu.Lock()
-					fmt.Fprintf(stderr, "Warning: failed to parse %s: %v\n", f.Path, err)
+					_, _ = fmt.Fprintf(stderr, "Warning: failed to parse %s: %v\n", f.Path, err)
 					stderrMu.Unlock()
 					continue
 				}
