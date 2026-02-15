@@ -145,6 +145,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 
 	// Write cache
 	if cachePath != "" {
+		_ = os.MkdirAll(filepath.Dir(cachePath), 0o755)
 		_ = os.WriteFile(cachePath, []byte(output+"\n"), 0o644)
 	}
 
