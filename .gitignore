@@ -21,3 +21,5 @@ dist/
 
 # Cache
 .cache/
+
+.claude/
