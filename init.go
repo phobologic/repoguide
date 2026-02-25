@@ -73,12 +73,22 @@ Flags:
 func generateSection() string {
 	body := `## repoguide — Repository Map
 
-Run ` + "`repoguide`" + ` via the Bash tool at the start of any task on an unfamiliar
-codebase. It produces a ranked map of files, symbols, and dependencies that
-replaces the need for broad initial exploration.
+Run ` + "`repoguide`" + ` via the Bash tool at the start of any task. It produces a ranked
+map of files, symbols, and dependencies that replaces the need for broad initial
+exploration.
 
-**Availability:** Check with ` + "`repoguide --version`" + ` first; skip gracefully if
-not found.
+**Availability:** Run ` + "`repoguide --cache .repoguide-cache`" + ` directly. If the
+command fails (not installed or no supported files found), skip using the output
+and proceed without it. Place ` + "`.repoguide-cache`" + ` at the project root and add it
+to ` + "`.gitignore`" + `.
+
+**When to run it:** Run it directly via Bash before launching any subagents —
+even in plan mode, where it counts as a permitted read-only action. Do not send
+Explore agents to discover structure that repoguide already provides.
+
+**Sharing with subagents:** If subagents are needed after running repoguide,
+include the ranked file list and relevant symbols in their prompt so they do not
+re-explore what you already have.
 
 **Run it:**
 ` + "```" + `bash
@@ -94,10 +104,8 @@ repoguide --file internal/auth               # focused: symbols and deps for a p
 repoguide --symbol Handle --file server      # focused: combine filters (AND)
 ` + "```" + `
 
-**Caching:** Use ` + "`--cache <file>`" + ` to avoid re-parsing on every call — essential
-for large repos. Add the cache file to ` + "`.gitignore`" + `. A conventional path is
-` + "`.repoguide-cache`" + `. Filter flags (` + "`--symbol`" + `, ` + "`--file`" + `) bypass the cache read
-but the full output is still written to cache.
+**Caching:** Filter flags (` + "`--symbol`" + `, ` + "`--file`" + `) bypass the cache read
+but the full output is still written to cache, so subsequent full runs stay fast.
 
 **All flags:** ` + "`repoguide --help`" + `
 
