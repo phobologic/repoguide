@@ -27,6 +27,7 @@ type Tag struct {
 	Line       int
 	File       string
 	Signature  string
+	Enclosing  string // qualified name of enclosing func/method for reference tags; "" if top-level
 }
 
 // FileInfo holds metadata and extracted tags for a single source file.
@@ -45,10 +46,19 @@ type Dependency struct {
 	Symbols []string
 }
 
+// CallEdge represents a function-level call: Caller calls Callee.
+// Both names are the qualified symbol names as they appear in definitions
+// (e.g., "Server.Handle", "greet").
+type CallEdge struct {
+	Caller string
+	Callee string
+}
+
 // RepoMap is the complete analyzed repository map, ready for serialization.
 type RepoMap struct {
 	RepoName     string
 	Root         string
 	Files        []FileInfo
 	Dependencies []Dependency
+	CallEdges    []CallEdge
 }

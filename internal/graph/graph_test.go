@@ -138,3 +138,90 @@ func TestRankEmpty(t *testing.T) {
 	t.Parallel()
 	Rank(nil, nil) // should not panic
 }
+
+func TestBuildCallGraph(t *testing.T) {
+	t.Parallel()
+
+	fileInfos := []model.FileInfo{
+		{
+			Path:     "a.py",
+			Language: "python",
+			Tags: []model.Tag{
+				{Name: "bar", Kind: model.Definition, SymbolKind: model.Function},
+				{Name: "foo", Kind: model.Definition, SymbolKind: model.Function},
+				// foo calls bar (in-repo, should be included)
+				{Name: "bar", Kind: model.Reference, SymbolKind: model.Function, Enclosing: "foo"},
+				// foo calls external (not in-repo, should be excluded)
+				{Name: "print", Kind: model.Reference, SymbolKind: model.Function, Enclosing: "foo"},
+				// top-level call (no enclosing, should be excluded)
+				{Name: "bar", Kind: model.Reference, SymbolKind: model.Function, Enclosing: ""},
+			},
+		},
+	}
+
+	edges := BuildCallGraph(fileInfos)
+	if len(edges) != 1 {
+		t.Fatalf("expected 1 edge, got %d: %+v", len(edges), edges)
+	}
+	if edges[0].Caller != "foo" || edges[0].Callee != "bar" {
+		t.Errorf("unexpected edge: %+v", edges[0])
+	}
+}
+
+func TestBuildCallGraphDeduplication(t *testing.T) {
+	t.Parallel()
+
+	fileInfos := []model.FileInfo{
+		{
+			Path:     "a.py",
+			Language: "python",
+			Tags: []model.Tag{
+				{Name: "bar", Kind: model.Definition, SymbolKind: model.Function},
+				{Name: "foo", Kind: model.Definition, SymbolKind: model.Function},
+				// foo calls bar multiple times — should produce only one edge
+				{Name: "bar", Kind: model.Reference, SymbolKind: model.Function, Enclosing: "foo"},
+				{Name: "bar", Kind: model.Reference, SymbolKind: model.Function, Enclosing: "foo"},
+			},
+		},
+	}
+
+	edges := BuildCallGraph(fileInfos)
+	if len(edges) != 1 {
+		t.Errorf("expected 1 deduplicated edge, got %d: %+v", len(edges), edges)
+	}
+}
+
+func TestBuildCallGraphSorting(t *testing.T) {
+	t.Parallel()
+
+	fileInfos := []model.FileInfo{
+		{
+			Path:     "a.py",
+			Language: "python",
+			Tags: []model.Tag{
+				{Name: "bar", Kind: model.Definition, SymbolKind: model.Function},
+				{Name: "baz", Kind: model.Definition, SymbolKind: model.Function},
+				{Name: "foo", Kind: model.Definition, SymbolKind: model.Function},
+				{Name: "baz", Kind: model.Reference, SymbolKind: model.Function, Enclosing: "foo"},
+				{Name: "bar", Kind: model.Reference, SymbolKind: model.Function, Enclosing: "foo"},
+			},
+		},
+	}
+
+	edges := BuildCallGraph(fileInfos)
+	if len(edges) != 2 {
+		t.Fatalf("expected 2 edges, got %d: %+v", len(edges), edges)
+	}
+	// Should be sorted: foo,bar before foo,baz
+	if edges[0].Callee != "bar" || edges[1].Callee != "baz" {
+		t.Errorf("unexpected order: %+v", edges)
+	}
+}
+
+func TestBuildCallGraphEmpty(t *testing.T) {
+	t.Parallel()
+	edges := BuildCallGraph(nil)
+	if edges != nil {
+		t.Errorf("expected nil, got %v", edges)
+	}
+}

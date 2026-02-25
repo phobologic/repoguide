@@ -14,7 +14,41 @@ func init() {
 		lang:             python.GetLanguage(),
 		FindMethodClass:  pythonFindMethodClass,
 		ExtractSignature: pythonExtractSignature,
+		FindEnclosingDef: pythonFindEnclosingDef,
 	}
+}
+
+// pythonFindEnclosingDef returns the qualified name of the function or method
+// containing the given call-site node (e.g., "MyClass.method" or "funcName").
+// Returns "" if the call is at module top-level.
+func pythonFindEnclosingDef(node *sitter.Node, source []byte) string {
+	current := node.Parent()
+	for current != nil {
+		if current.Type() == "function_definition" {
+			var funcName string
+			for i := 0; i < int(current.ChildCount()); i++ {
+				child := current.Child(i)
+				if child.Type() == "identifier" {
+					funcName = NodeText(child, source)
+					break
+				}
+			}
+			if funcName == "" {
+				return ""
+			}
+			if cls := pythonFindEnclosingClass(current); cls != nil {
+				for i := 0; i < int(cls.ChildCount()); i++ {
+					child := cls.Child(i)
+					if child.Type() == "identifier" {
+						return NodeText(child, source) + "." + funcName
+					}
+				}
+			}
+			return funcName
+		}
+		current = current.Parent()
+	}
+	return ""
 }
 
 func pythonFindMethodClass(funcNode *sitter.Node, source []byte) string {

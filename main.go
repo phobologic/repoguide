@@ -127,12 +127,14 @@ func run(args []string, stdout, stderr io.Writer) error {
 	// Build graph and rank
 	deps := graph.BuildGraph(fileInfos)
 	graph.Rank(fileInfos, deps)
+	callEdges := graph.BuildCallGraph(fileInfos)
 
 	rm := &model.RepoMap{
 		RepoName:     filepath.Base(root),
 		Root:         filepath.Base(root),
 		Files:        fileInfos,
 		Dependencies: deps,
+		CallEdges:    callEdges,
 	}
 
 	// Select top N files

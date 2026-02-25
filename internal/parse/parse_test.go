@@ -437,6 +437,147 @@ foo.bar(1)
 
 // --- helpers ---
 
+// --- Enclosing field tests ---
+
+func TestGoCallEnclosing(t *testing.T) {
+	t.Parallel()
+	_, extract := setup(t, "go")
+
+	tags := extract(`package main
+func outer() {
+	doStuff()
+}
+`)
+	refs := filterRefs(tags)
+	for _, r := range refs {
+		if r.Name == "doStuff" {
+			if r.Enclosing != "outer" {
+				t.Errorf("Enclosing = %q, want outer", r.Enclosing)
+			}
+			return
+		}
+	}
+	t.Error("doStuff call not found")
+}
+
+func TestGoMethodCallEnclosing(t *testing.T) {
+	t.Parallel()
+	_, extract := setup(t, "go")
+
+	tags := extract(`package main
+func (s *Server) Handle() {
+	s.parse()
+}
+`)
+	refs := filterRefs(tags)
+	for _, r := range refs {
+		if r.Name == "parse" {
+			if r.Enclosing != "Server.Handle" {
+				t.Errorf("Enclosing = %q, want Server.Handle", r.Enclosing)
+			}
+			return
+		}
+	}
+	t.Error("parse call not found")
+}
+
+func TestGoTopLevelCallNoEnclosing(t *testing.T) {
+	t.Parallel()
+	_, extract := setup(t, "go")
+
+	// Package-level variable initializer — call is outside any function.
+	tags := extract(`package main
+
+var x = foo()
+`)
+	refs := filterRefs(tags)
+	for _, r := range refs {
+		if r.Name == "foo" && r.Enclosing != "" {
+			t.Errorf("top-level call should have empty Enclosing, got %q", r.Enclosing)
+		}
+	}
+}
+
+func TestGoClosureCallNoEnclosing(t *testing.T) {
+	t.Parallel()
+	_, extract := setup(t, "go")
+
+	// Call inside a closure should not be attributed to outer().
+	tags := extract(`package main
+func outer() {
+	f := func() {
+		inner()
+	}
+	_ = f
+}
+`)
+	refs := filterRefs(tags)
+	for _, r := range refs {
+		if r.Name == "inner" {
+			if r.Enclosing != "" {
+				t.Errorf("closure call Enclosing = %q, want empty (not attributed to outer)", r.Enclosing)
+			}
+			return
+		}
+	}
+	t.Error("inner call not found")
+}
+
+func TestPythonMethodCallEnclosing(t *testing.T) {
+	t.Parallel()
+	_, extract := setup(t, "python")
+
+	tags := extract(`class MyClass:
+    def method(self):
+        helper()
+`)
+	refs := filterRefs(tags)
+	for _, r := range refs {
+		if r.Name == "helper" {
+			if r.Enclosing != "MyClass.method" {
+				t.Errorf("Enclosing = %q, want MyClass.method", r.Enclosing)
+			}
+			return
+		}
+	}
+	t.Error("helper call not found")
+}
+
+func TestPythonTopLevelCallNoEnclosing(t *testing.T) {
+	t.Parallel()
+	_, extract := setup(t, "python")
+
+	tags := extract("foo()\n")
+	refs := filterRefs(tags)
+	for _, r := range refs {
+		if r.Name == "foo" && r.Enclosing != "" {
+			t.Errorf("top-level call should have empty Enclosing, got %q", r.Enclosing)
+		}
+	}
+}
+
+func TestRubyMethodCallEnclosing(t *testing.T) {
+	t.Parallel()
+	_, extract := setup(t, "ruby")
+
+	tags := extract(`class MyClass
+  def my_method
+    helper()
+  end
+end
+`)
+	refs := filterRefs(tags)
+	for _, r := range refs {
+		if r.Name == "helper" {
+			if r.Enclosing != "MyClass.my_method" {
+				t.Errorf("Enclosing = %q, want MyClass.my_method", r.Enclosing)
+			}
+			return
+		}
+	}
+	t.Error("helper call not found")
+}
+
 func filterDefs(tags []model.Tag) []model.Tag {
 	var out []model.Tag
 	for _, t := range tags {

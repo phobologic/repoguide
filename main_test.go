@@ -288,6 +288,31 @@ func TestRunMaxFileSize(t *testing.T) {
 	}
 }
 
+func TestRunCalls(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeTestFile(t, dir, "utils.py", `def helper():
+    pass
+`)
+	writeTestFile(t, dir, "main.py", `def greet():
+    helper()
+`)
+
+	var stdout, stderr bytes.Buffer
+	err := run([]string{dir}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run: %v\nstderr: %s", err, stderr.String())
+	}
+
+	out := stdout.String()
+	if !strings.Contains(out, "calls[") {
+		t.Errorf("missing calls section:\n%s", out)
+	}
+	if !strings.Contains(out, "greet,helper") {
+		t.Errorf("missing greet→helper call edge:\n%s", out)
+	}
+}
+
 func TestReorderArgs(t *testing.T) {
 	t.Parallel()
 

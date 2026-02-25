@@ -14,6 +14,7 @@ func init() {
 		lang:             golang.GetLanguage(),
 		FindReceiverType: goFindReceiverType,
 		ExtractSignature: goExtractSignature,
+		FindEnclosingDef: goFindEnclosingDef,
 	}
 }
 
@@ -98,6 +99,43 @@ func goExtractSignature(defNode *sitter.Node, kind model.SymbolKind, source []by
 		sig += " " + result
 	}
 	return sig
+}
+
+// goFindEnclosingDef returns the qualified name of the function or method containing
+// the given call-site node. Returns "" if the call is at package level or inside a
+// func literal (closure), since those should not be attributed to a named function.
+func goFindEnclosingDef(node *sitter.Node, source []byte) string {
+	current := node.Parent()
+	for current != nil {
+		switch current.Type() {
+		case "function_declaration":
+			for i := 0; i < int(current.ChildCount()); i++ {
+				child := current.Child(i)
+				if child.Type() == "identifier" {
+					return NodeText(child, source)
+				}
+			}
+		case "method_declaration":
+			recv := goFindReceiverType(current, source)
+			var methodName string
+			for i := 0; i < int(current.ChildCount()); i++ {
+				child := current.Child(i)
+				if child.Type() == "field_identifier" {
+					methodName = NodeText(child, source)
+					break
+				}
+			}
+			if recv != "" && methodName != "" {
+				return recv + "." + methodName
+			}
+			return methodName
+		case "func_literal":
+			// Stop at closure boundaries — don't attribute closure calls to outer func.
+			return ""
+		}
+		current = current.Parent()
+	}
+	return ""
 }
 
 // isReceiverList checks if a parameter_list is the receiver (appears before the method name).

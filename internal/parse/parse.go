@@ -96,6 +96,13 @@ func ExtractTags(l *lang.Language, parser *sitter.Parser, query *sitter.Query, s
 			signature = l.ExtractSignature(defNode, symbolKind, source)
 		}
 
+		var enclosing string
+		if tagKind == model.Reference && symbolKind == model.Function {
+			if l.FindEnclosingDef != nil {
+				enclosing = l.FindEnclosingDef(defNode, source)
+			}
+		}
+
 		tags = append(tags, model.Tag{
 			Name:       effectiveName,
 			Kind:       tagKind,
@@ -103,6 +110,7 @@ func ExtractTags(l *lang.Language, parser *sitter.Parser, query *sitter.Query, s
 			Line:       int(nameNode.StartPoint().Row) + 1,
 			File:       filePath,
 			Signature:  signature,
+			Enclosing:  enclosing,
 		})
 	}
 

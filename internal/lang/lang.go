@@ -38,6 +38,11 @@ type Language struct {
 
 	// ExtractSignature returns a signature string for a definition node.
 	ExtractSignature func(node *sitter.Node, kind model.SymbolKind, source []byte) string
+
+	// FindEnclosingDef returns the qualified name of the enclosing function/method
+	// for a call-site node (e.g., "MyType.Method" or "funcName").
+	// Returns "" if the call is at top-level or inside an anonymous function.
+	FindEnclosingDef func(node *sitter.Node, source []byte) string
 }
 
 // GetLanguage returns the tree-sitter Language pointer.

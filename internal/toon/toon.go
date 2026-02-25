@@ -66,6 +66,13 @@ func Encode(rm *model.RepoMap) string {
 	}
 	parts = append(parts, formatTabular("dependencies", []string{"source", "target", "symbols"}, depRows))
 
+	var callRows [][]string
+	for i := range rm.CallEdges {
+		ce := &rm.CallEdges[i]
+		callRows = append(callRows, []string{ce.Caller, ce.Callee})
+	}
+	parts = append(parts, formatTabular("calls", []string{"caller", "callee"}, callRows))
+
 	return strings.Join(parts, "\n")
 }
 

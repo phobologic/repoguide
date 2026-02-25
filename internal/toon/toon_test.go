@@ -157,4 +157,31 @@ func TestEncodeEmpty(t *testing.T) {
 	if !strings.Contains(got, "symbols[0]{file,name,kind,line,signature}:") {
 		t.Errorf("expected empty symbols section, got:\n%s", got)
 	}
+	if !strings.Contains(got, "calls[0]{caller,callee}:") {
+		t.Errorf("expected empty calls section, got:\n%s", got)
+	}
+}
+
+func TestEncodeCallEdges(t *testing.T) {
+	t.Parallel()
+
+	rm := &model.RepoMap{
+		RepoName: "r",
+		Root:     "r",
+		CallEdges: []model.CallEdge{
+			{Caller: "foo", Callee: "bar"},
+			{Caller: "MyClass.method", Callee: "helper"},
+		},
+	}
+
+	got := Encode(rm)
+	if !strings.Contains(got, "calls[2]{caller,callee}:") {
+		t.Errorf("missing calls header:\n%s", got)
+	}
+	if !strings.Contains(got, "  foo,bar") {
+		t.Errorf("missing foo,bar edge:\n%s", got)
+	}
+	if !strings.Contains(got, "  MyClass.method,helper") {
+		t.Errorf("missing MyClass.method,helper edge:\n%s", got)
+	}
 }

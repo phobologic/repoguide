@@ -14,7 +14,71 @@ func init() {
 		lang:             ruby.GetLanguage(),
 		FindMethodClass:  rubyFindMethodClass,
 		ExtractSignature: rubyExtractSignature,
+		FindEnclosingDef: rubyFindEnclosingDef,
 	}
+}
+
+// rubyFindEnclosingDef returns the qualified name of the method containing
+// the given call-site node (e.g., "MyClass.method" or "methodName").
+// Returns "" if the call is at class/module body level or script top-level.
+func rubyFindEnclosingDef(node *sitter.Node, source []byte) string {
+	current := node.Parent()
+	for current != nil {
+		switch current.Type() {
+		case "method":
+			var methodName string
+			for i := 0; i < int(current.ChildCount()); i++ {
+				child := current.Child(i)
+				if child.Type() == "identifier" {
+					methodName = NodeText(child, source)
+					break
+				}
+			}
+			if methodName == "" {
+				return ""
+			}
+			// Walk further ancestors for enclosing class/module.
+			ancestor := current.Parent()
+			for ancestor != nil {
+				if ancestor.Type() == "class" || ancestor.Type() == "module" {
+					cls := rubyClassName(ancestor, source)
+					if cls != "" {
+						return cls + "." + methodName
+					}
+					break
+				}
+				ancestor = ancestor.Parent()
+			}
+			return methodName
+
+		case "singleton_method":
+			// def self.foo — find the last identifier (the method name, not "self").
+			var methodName string
+			for i := 0; i < int(current.ChildCount()); i++ {
+				child := current.Child(i)
+				if child.Type() == "identifier" {
+					methodName = NodeText(child, source)
+				}
+			}
+			if methodName == "" {
+				return ""
+			}
+			ancestor := current.Parent()
+			for ancestor != nil {
+				if ancestor.Type() == "class" || ancestor.Type() == "module" {
+					cls := rubyClassName(ancestor, source)
+					if cls != "" {
+						return cls + "." + methodName
+					}
+					break
+				}
+				ancestor = ancestor.Parent()
+			}
+			return methodName
+		}
+		current = current.Parent()
+	}
+	return ""
 }
 
 // rubyFindMethodClass walks the parent chain looking for a class or module node.

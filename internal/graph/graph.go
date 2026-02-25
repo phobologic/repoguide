@@ -76,6 +76,53 @@ func BuildGraph(fileInfos []model.FileInfo) []model.Dependency {
 	return deps
 }
 
+// BuildCallGraph builds function-level call edges from the parsed file infos.
+// An edge is only included when the callee is a known definition in the repo
+// and the caller (Enclosing) is non-empty. Edges are deduplicated and sorted.
+func BuildCallGraph(fileInfos []model.FileInfo) []model.CallEdge {
+	// Build set of all known definition names.
+	knownDefs := make(map[string]struct{})
+	for i := range fileInfos {
+		for j := range fileInfos[i].Tags {
+			tag := &fileInfos[i].Tags[j]
+			if tag.Kind == model.Definition {
+				knownDefs[tag.Name] = struct{}{}
+			}
+		}
+	}
+
+	type edgeKey struct{ caller, callee string }
+	seen := make(map[edgeKey]struct{})
+
+	var edges []model.CallEdge
+	for i := range fileInfos {
+		for j := range fileInfos[i].Tags {
+			tag := &fileInfos[i].Tags[j]
+			if tag.Kind != model.Reference || tag.Enclosing == "" {
+				continue
+			}
+			if _, ok := knownDefs[tag.Name]; !ok {
+				continue
+			}
+			key := edgeKey{tag.Enclosing, tag.Name}
+			if _, dup := seen[key]; dup {
+				continue
+			}
+			seen[key] = struct{}{}
+			edges = append(edges, model.CallEdge{Caller: tag.Enclosing, Callee: tag.Name})
+		}
+	}
+
+	sort.Slice(edges, func(i, j int) bool {
+		if edges[i].Caller != edges[j].Caller {
+			return edges[i].Caller < edges[j].Caller
+		}
+		return edges[i].Callee < edges[j].Callee
+	})
+
+	return edges
+}
+
 // Rank applies PageRank to file_infos and sorts them by rank descending.
 func Rank(fileInfos []model.FileInfo, deps []model.Dependency) {
 	if len(fileInfos) == 0 {
