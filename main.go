@@ -2,6 +2,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -28,12 +29,19 @@ const defaultMaxFileSize = 1_000_000 // 1 MB
 
 func main() {
 	if err := run(os.Args[1:], os.Stdout, os.Stderr); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			os.Exit(0)
+		}
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
 func run(args []string, stdout, stderr io.Writer) error {
+	if len(args) > 0 && args[0] == "init" {
+		return runInit(args[1:], stdout, stderr)
+	}
+
 	fs := flag.NewFlagSet("repoguide", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 
@@ -50,11 +58,38 @@ func run(args []string, stdout, stderr io.Writer) error {
 	fs.IntVar(&maxFiles, "max-files", 0, "maximum number of files to include")
 	fs.StringVar(&langs, "l", "", "comma-separated languages to include")
 	fs.StringVar(&langs, "langs", "", "comma-separated languages to include")
-	fs.StringVar(&cachePath, "cache", "", "cache file path")
-	fs.IntVar(&maxFileSize, "max-file-size", defaultMaxFileSize, "skip files larger than this many bytes")
+	fs.StringVar(&cachePath, "cache", "", "cache output to `file` (add to .gitignore if used)")
+	fs.IntVar(&maxFileSize, "max-file-size", defaultMaxFileSize, "skip files larger than `bytes`")
 	fs.BoolVar(&showVersion, "V", false, "show version and exit")
 	fs.BoolVar(&showVersion, "version", false, "show version and exit")
 	fs.BoolVar(&raw, "raw", false, "output raw TOON without agent context header")
+
+	fs.Usage = func() {
+		fmt.Fprintf(stderr, `Usage: repoguide [flags] [path]
+       repoguide <subcommand> [flags] [args]
+
+Generate a repository map in TOON format for use with Claude Code and other AI
+coding assistants. Analyzes source files and produces a ranked list of files,
+exported symbols, cross-file dependencies, and call graph edges.
+
+path defaults to the current directory.
+
+Subcommands:
+  init    write a repoguide usage section to a CLAUDE.md file
+          run "repoguide init --help" for details
+
+Examples:
+  repoguide                               current directory, all languages
+  repoguide /path/to/repo                 explicit path
+  repoguide -l go,typescript              filter by language
+  repoguide -n 20                         top 20 files (large repos)
+  repoguide --cache .repoguide-cache      cache output for faster re-runs
+  repoguide init                          add repoguide section to ./CLAUDE.md
+
+Flags:
+`)
+		fs.PrintDefaults()
+	}
 
 	if err := fs.Parse(reorderArgs(args)); err != nil {
 		return err

@@ -43,7 +43,7 @@ repoguide [ROOT] [OPTIONS]
 | `ROOT` | Repository root directory (default: `.`) |
 | `--max-files`, `-n` | Limit output to top N files by PageRank (min: 1) |
 | `--langs`, `-l` | Comma-separated languages to include (e.g., `python,go`) |
-| `--cache` | Cache file path; reuses if newer than all source files |
+| `--cache` | Cache output to file; reuses if newer than all source files (add to `.gitignore`) |
 | `--max-file-size` | Skip files larger than this many bytes (default: 1MB) |
 | `--raw` | Output raw TOON without agent context header |
 | `--version`, `-V` | Show version and exit |
@@ -75,6 +75,34 @@ symbols[17]{file,name,kind,line,signature}:
   ...
 dependencies[1]{source,target,symbols}:
   myproject/discovery.py,myproject/languages.py,language_for_extension
+```
+
+## Subcommands
+
+### `repoguide init`
+
+```
+repoguide init [--dry-run] [path-to-CLAUDE.md]
+```
+
+Writes a repoguide usage section to a CLAUDE.md file, creating it if it doesn't
+exist. The section instructs Claude Code to call `repoguide` at the start of
+tasks and explains how to read the output.
+
+```
+repoguide init                     # write to ./CLAUDE.md
+repoguide init path/to/CLAUDE.md   # explicit path
+repoguide init --dry-run           # print the generated section, no file written
+repoguide init --dry-run CLAUDE.md # print what the full file would look like
+```
+
+The block is wrapped in HTML sentinel comments so subsequent runs replace only
+that section, leaving surrounding content untouched:
+
+```
+<!-- repoguide:start -->
+...generated content...
+<!-- repoguide:end -->
 ```
 
 ## Claude Code integration
