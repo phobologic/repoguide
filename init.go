@@ -23,7 +23,7 @@ func runInit(args []string, stdout, stderr io.Writer) error {
 	fs.BoolVar(&dryRun, "dry-run", false, "print what would be written without modifying the file")
 
 	fs.Usage = func() {
-		fmt.Fprintf(stderr, `Usage: repoguide init [flags] [path-to-CLAUDE.md]
+		_, _ = fmt.Fprintf(stderr, `Usage: repoguide init [flags] [path-to-CLAUDE.md]
 
 Write a repoguide usage section to a CLAUDE.md file. The section is wrapped in
 sentinel comments so it can be updated in place on subsequent runs without
@@ -88,11 +88,16 @@ repoguide -l go,typescript                   # filter by language
 repoguide -n 20                              # limit to top 20 files (large repos)
 repoguide --cache .repoguide-cache           # cache output (fast on repeat runs)
 repoguide --cache .repoguide-cache /repo     # cache + explicit path
+
+repoguide --symbol BuildGraph                # focused: symbol + its callers/callees
+repoguide --file internal/auth               # focused: symbols and deps for a path
+repoguide --symbol Handle --file server      # focused: combine filters (AND)
 ` + "```" + `
 
 **Caching:** Use ` + "`--cache <file>`" + ` to avoid re-parsing on every call — essential
 for large repos. Add the cache file to ` + "`.gitignore`" + `. A conventional path is
-` + "`.repoguide-cache`" + `.
+` + "`.repoguide-cache`" + `. Filter flags (` + "`--symbol`" + `, ` + "`--file`" + `) bypass the cache read
+but the full output is still written to cache.
 
 **All flags:** ` + "`repoguide --help`" + `
 
@@ -111,7 +116,17 @@ for large repos. Add the cache file to ` + "`.gitignore`" + `. A conventional pa
 
 4. **Only fall back to Glob/Grep for things repoguide cannot answer** — e.g.,
    finding all usages of a symbol, or searching within a file you've already
-   identified.`
+   identified.
+
+5. **Use ` + "`--symbol`" + ` when you know the name.** Before Grep-ing for a function,
+   run ` + "`repoguide --symbol <name>`" + ` to get its definition, callers, callees, and
+   relevant files in one shot. Faster than searching and more complete.
+
+6. **Use ` + "`--file`" + ` when focused on a subsystem.** ` + "`repoguide --file internal/auth`" + `
+   gives all symbols and dependencies for that path without full-map noise.
+
+7. **Combine filters for precision.** ` + "`--symbol`" + ` and ` + "`--file`" + ` can be used together
+   (AND semantics) when a symbol name is common across packages.`
 
 	return sentinelStart + "\n" + body + "\n" + sentinelEnd
 }

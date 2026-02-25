@@ -212,6 +212,8 @@ func TestInitSectionContainsExamples(t *testing.T) {
 		"-n 20",
 		"--cache",
 		".repoguide-cache",
+		"--symbol",
+		"--file",
 	}
 	for _, ex := range examples {
 		if !strings.Contains(section, ex) {

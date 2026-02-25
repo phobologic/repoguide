@@ -45,6 +45,8 @@ repoguide [ROOT] [OPTIONS]
 | `--langs`, `-l` | Comma-separated languages to include (e.g., `python,go`) |
 | `--cache` | Cache output to file; reuses if newer than all source files (add to `.gitignore`) |
 | `--max-file-size` | Skip files larger than this many bytes (default: 1MB) |
+| `--symbol` | Filter output to symbols matching this substring (case-insensitive) |
+| `--file` | Filter output to files matching this substring (case-insensitive) |
 | `--raw` | Output raw TOON without agent context header |
 | `--version`, `-V` | Show version and exit |
 
@@ -76,6 +78,21 @@ symbols[17]{file,name,kind,line,signature}:
 dependencies[1]{source,target,symbols}:
   myproject/discovery.py,myproject/languages.py,language_for_extension
 ```
+
+### Focused queries
+
+Use `--symbol` and `--file` to get a targeted view instead of the full map.
+These are useful when asking Claude about a specific function or subsystem.
+
+```
+repoguide --symbol BuildGraph        # show BuildGraph: definition, callers, callees
+repoguide --file internal/auth       # show all symbols and deps for auth package
+repoguide --symbol Handle --file srv # combine: Handle symbol scoped to srv files
+```
+
+Both flags do case-insensitive substring matching and can be combined (AND semantics).
+When active, the cache is bypassed for reading but the full unfiltered output is still
+written to cache on the same run.
 
 ## Subcommands
 

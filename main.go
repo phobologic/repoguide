@@ -46,12 +46,14 @@ func run(args []string, stdout, stderr io.Writer) error {
 	fs.SetOutput(stderr)
 
 	var (
-		maxFiles    int
-		langs       string
-		cachePath   string
-		maxFileSize int
-		showVersion bool
-		raw         bool
+		maxFiles     int
+		langs        string
+		cachePath    string
+		maxFileSize  int
+		showVersion  bool
+		raw          bool
+		symbolFilter string
+		fileFilter   string
 	)
 
 	fs.IntVar(&maxFiles, "n", 0, "maximum number of files to include")
@@ -63,9 +65,11 @@ func run(args []string, stdout, stderr io.Writer) error {
 	fs.BoolVar(&showVersion, "V", false, "show version and exit")
 	fs.BoolVar(&showVersion, "version", false, "show version and exit")
 	fs.BoolVar(&raw, "raw", false, "output raw TOON without agent context header")
+	fs.StringVar(&symbolFilter, "symbol", "", "filter output to symbols matching this `substring` (case-insensitive)")
+	fs.StringVar(&fileFilter, "file", "", "filter output to files matching this `substring` (case-insensitive)")
 
 	fs.Usage = func() {
-		fmt.Fprintf(stderr, `Usage: repoguide [flags] [path]
+		_, _ = fmt.Fprintf(stderr, `Usage: repoguide [flags] [path]
        repoguide <subcommand> [flags] [args]
 
 Generate a repository map in TOON format for use with Claude Code and other AI
@@ -79,12 +83,17 @@ Subcommands:
           run "repoguide init --help" for details
 
 Examples:
-  repoguide                               current directory, all languages
-  repoguide /path/to/repo                 explicit path
-  repoguide -l go,typescript              filter by language
-  repoguide -n 20                         top 20 files (large repos)
-  repoguide --cache .repoguide-cache      cache output for faster re-runs
-  repoguide init                          add repoguide section to ./CLAUDE.md
+  repoguide                                  current directory, all languages
+  repoguide /path/to/repo                    explicit path
+  repoguide -l go,typescript                 filter by language
+  repoguide -n 20                            top 20 files (large repos)
+  repoguide --cache .repoguide-cache         cache output for faster re-runs
+  repoguide init                             add repoguide section to ./CLAUDE.md
+
+  repoguide --symbol BuildGraph              show BuildGraph and its callers/callees
+  repoguide --symbol encode                  case-insensitive: matches Encode, encodeValue
+  repoguide --file internal/toon             symbols and deps for the toon package
+  repoguide --symbol Encode --file toon      combined: symbol AND file filter
 
 Flags:
 `)
@@ -138,8 +147,9 @@ Flags:
 		return fmt.Errorf("no parseable files found")
 	}
 
-	// Check cache freshness
-	if cachePath != "" && cacheIsFresh(cachePath, root, files) {
+	// Check cache freshness (skip when filter flags are active)
+	filterActive := symbolFilter != "" || fileFilter != ""
+	if !filterActive && cachePath != "" && cacheIsFresh(cachePath, root, files) {
 		data, err := os.ReadFile(cachePath)
 		if err == nil {
 			writeOutput(stdout, strings.TrimRight(string(data), "\n"), raw)
@@ -175,6 +185,14 @@ Flags:
 	// Select top N files
 	if maxFiles > 0 {
 		rm = ranking.SelectFiles(rm, maxFiles)
+	}
+
+	// Apply focused query filters
+	if symbolFilter != "" {
+		rm = ranking.FilterBySymbol(rm, symbolFilter)
+	}
+	if fileFilter != "" {
+		rm = ranking.FilterByFile(rm, fileFilter)
 	}
 
 	// Encode to TOON
@@ -333,6 +351,8 @@ var flagsWithValue = map[string]bool{
 	"-langs": true, "--langs": true,
 	"-cache": true, "--cache": true,
 	"-max-file-size": true, "--max-file-size": true,
+	"-symbol": true, "--symbol": true,
+	"-file": true, "--file": true,
 }
 
 // reorderArgs moves positional arguments after all flags so Go's flag package

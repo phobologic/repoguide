@@ -313,6 +313,121 @@ func TestRunCalls(t *testing.T) {
 	}
 }
 
+func TestRunSymbolFilter(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeTestFile(t, dir, "utils.py", `def helper():
+    pass
+`)
+	writeTestFile(t, dir, "main.py", `def greet():
+    helper()
+`)
+
+	var stdout, stderr bytes.Buffer
+	err := run([]string{"--symbol", "helper", dir}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run: %v\nstderr: %s", err, stderr.String())
+	}
+
+	out := stdout.String()
+	if !strings.Contains(out, "utils.py") {
+		t.Errorf("utils.py (defines helper) should be in output:\n%s", out)
+	}
+	// greet calls helper, so main.py should also be included via call expansion.
+	if !strings.Contains(out, "main.py") {
+		t.Errorf("main.py (defines greet which calls helper) should be in output:\n%s", out)
+	}
+	if !strings.Contains(out, "helper,function") {
+		t.Errorf("helper definition should appear in symbols:\n%s", out)
+	}
+}
+
+func TestRunSymbolFilterNoMatch(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeTestFile(t, dir, "main.py", "def greet():\n    pass\n")
+
+	var stdout, stderr bytes.Buffer
+	err := run([]string{"--symbol", "NoSuchSymbol", dir}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+
+	out := stdout.String()
+	if !strings.Contains(out, "files[0]") {
+		t.Errorf("expected empty files table:\n%s", out)
+	}
+}
+
+func TestRunFileFilter(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeTestFile(t, dir, "utils.py", "def helper():\n    pass\n")
+	writeTestFile(t, dir, "main.py", "def greet():\n    helper()\n")
+
+	var stdout, stderr bytes.Buffer
+	err := run([]string{"--file", "utils", dir}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run: %v\nstderr: %s", err, stderr.String())
+	}
+
+	out := stdout.String()
+	if !strings.Contains(out, "utils.py") {
+		t.Errorf("utils.py should be in output:\n%s", out)
+	}
+	if strings.Contains(out, "main.py") && !strings.Contains(out, "dependencies") {
+		// main.py only appears if it's in a dep edge, not as a file row
+		t.Errorf("main.py should not appear as a file:\n%s", out)
+	}
+	if !strings.Contains(out, "helper,function") {
+		t.Errorf("helper definition should appear:\n%s", out)
+	}
+}
+
+func TestRunSymbolAndFileFilter(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeTestFile(t, dir, "pkg/utils.py", "def helper():\n    pass\n")
+	writeTestFile(t, dir, "other/utils.py", "def other_helper():\n    pass\n")
+
+	var stdout, stderr bytes.Buffer
+	err := run([]string{"--symbol", "helper", "--file", "pkg", dir}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run: %v\nstderr: %s", err, stderr.String())
+	}
+
+	out := stdout.String()
+	// --file pkg filters to pkg/utils.py; --symbol helper must be in that file.
+	if !strings.Contains(out, "pkg/utils.py") {
+		t.Errorf("pkg/utils.py should be in output:\n%s", out)
+	}
+}
+
+func TestRunSymbolFilterCacheSkipped(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeTestFile(t, dir, "main.py", "def greet():\n    pass\n")
+	cachePath := filepath.Join(t.TempDir(), "cache.toon")
+
+	// First run: no filter, write cache.
+	var stdout1 bytes.Buffer
+	if err := run([]string{"--cache", cachePath, dir}, &stdout1, &bytes.Buffer{}); err != nil {
+		t.Fatalf("first run: %v", err)
+	}
+	if _, err := os.Stat(cachePath); err != nil {
+		t.Fatalf("cache not written: %v", err)
+	}
+
+	// Second run: with --symbol filter. Cache should be bypassed (filter still works).
+	var stdout2 bytes.Buffer
+	if err := run([]string{"--symbol", "greet", "--cache", cachePath, dir}, &stdout2, &bytes.Buffer{}); err != nil {
+		t.Fatalf("second run: %v", err)
+	}
+	if !strings.Contains(stdout2.String(), "greet") {
+		t.Errorf("filter should work even when cache exists:\n%s", stdout2.String())
+	}
+}
+
 func TestReorderArgs(t *testing.T) {
 	t.Parallel()
 
