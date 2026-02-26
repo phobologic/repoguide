@@ -137,7 +137,9 @@ below). These bypass the cache read but write back to it, so full runs stay fast
    ` + "`repoguide --symbol <name>`" + ` first.** If the name is indexed, ` + "`--symbol`" + `
    returns structured file+line data you can feed directly to
    ` + "`Read(offset=N, limit=10)`" + `. Fall back to Grep only if ` + "`--symbol`" + ` returns no
-   results or the name is unexported/not a definition.
+   results or the name is unexported/not a definition. **Never pipe
+   ` + "`--symbol`" + ` or ` + "`--file`" + ` output through ` + "`head`" + ` or ` + "`tail`" + `** — the complete
+   output is the value; truncating it loses callsites.
 
 3. **` + "`--symbol`" + ` returns call sites AND import sites for a name.** The ` + "`callsites`" + `
    table includes every function-call occurrence (` + "`caller`" + ` = calling function) and

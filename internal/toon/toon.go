@@ -20,7 +20,10 @@ var (
 )
 
 // Encode converts a RepoMap into TOON format.
-func Encode(rm *model.RepoMap) string {
+// When focused is true (--symbol or --file query), callsites are emitted
+// immediately after files so truncation cuts noise rather than the primary
+// deliverable.
+func Encode(rm *model.RepoMap, focused bool) string {
 	var parts []string
 
 	parts = append(parts, fmt.Sprintf("repo: %s", encodeValue(rm.RepoName)))
@@ -36,6 +39,12 @@ func Encode(rm *model.RepoMap) string {
 		})
 	}
 	parts = append(parts, formatTabular("files", []string{"path", "language", "rank"}, fileRows))
+
+	// In focused mode, callsites come before symbols — they are the primary
+	// deliverable and must survive truncation.
+	if focused && len(rm.CallSites) > 0 {
+		parts = append(parts, encodeSites(rm.CallSites))
+	}
 
 	var symbolRows [][]string
 	for i := range rm.Files {
@@ -73,21 +82,21 @@ func Encode(rm *model.RepoMap) string {
 	}
 	parts = append(parts, formatTabular("calls", []string{"caller", "callee"}, callRows))
 
-	if len(rm.CallSites) > 0 {
-		var siteRows [][]string
-		for i := range rm.CallSites {
-			cs := &rm.CallSites[i]
-			siteRows = append(siteRows, []string{
-				cs.Caller,
-				cs.Callee,
-				cs.File,
-				fmt.Sprintf("%d", cs.Line),
-			})
-		}
-		parts = append(parts, formatTabular("callsites", []string{"caller", "callee", "file", "line"}, siteRows))
+	// In non-focused mode, callsites appear at the end (empty for full maps).
+	if !focused && len(rm.CallSites) > 0 {
+		parts = append(parts, encodeSites(rm.CallSites))
 	}
 
 	return strings.Join(parts, "\n")
+}
+
+func encodeSites(sites []model.CallSite) string {
+	rows := make([][]string, len(sites))
+	for i := range sites {
+		cs := &sites[i]
+		rows[i] = []string{cs.Caller, cs.Callee, cs.File, fmt.Sprintf("%d", cs.Line)}
+	}
+	return formatTabular("callsites", []string{"caller", "callee", "file", "line"}, rows)
 }
 
 func formatTabular(name string, columns []string, rows [][]string) string {

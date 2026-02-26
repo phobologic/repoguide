@@ -105,7 +105,7 @@ func TestEncode(t *testing.T) {
 		},
 	}
 
-	got := Encode(rm)
+	got := Encode(rm, false)
 
 	// Verify structure
 	lines := strings.Split(got, "\n")
@@ -150,7 +150,7 @@ func TestEncodeEmpty(t *testing.T) {
 		Root:     "empty",
 	}
 
-	got := Encode(rm)
+	got := Encode(rm, false)
 	if !strings.Contains(got, "files[0]{path,language,rank}:") {
 		t.Errorf("expected empty files section, got:\n%s", got)
 	}
@@ -174,7 +174,7 @@ func TestEncodeCallEdges(t *testing.T) {
 		},
 	}
 
-	got := Encode(rm)
+	got := Encode(rm, false)
 	if !strings.Contains(got, "calls[2]{caller,callee}:") {
 		t.Errorf("missing calls header:\n%s", got)
 	}
@@ -205,7 +205,7 @@ func TestEncodeCallSites(t *testing.T) {
 		},
 	}
 
-	got := Encode(rm)
+	got := Encode(rm, false)
 	if !strings.Contains(got, "callsites[2]{caller,callee,file,line}:") {
 		t.Errorf("missing callsites header:\n%s", got)
 	}

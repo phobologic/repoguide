@@ -112,7 +112,24 @@ func FilterBySymbol(rm *model.RepoMap, substr string) *model.RepoMap {
 	var files []model.FileInfo
 	for i := range rm.Files {
 		if _, ok := matchedFiles[rm.Files[i].Path]; ok {
-			files = append(files, rm.Files[i])
+			fi := rm.Files[i]
+			// Trim tags to only the matched and related definitions so the
+			// symbols table stays focused rather than dumping all exports from
+			// every matched file.
+			var filteredTags []model.Tag
+			for j := range fi.Tags {
+				tag := &fi.Tags[j]
+				if tag.Kind != model.Definition {
+					continue
+				}
+				_, isMatched := matchedSymbols[tag.Name]
+				_, isRelated := relatedSymbols[tag.Name]
+				if isMatched || isRelated {
+					filteredTags = append(filteredTags, *tag)
+				}
+			}
+			fi.Tags = filteredTags
+			files = append(files, fi)
 		}
 	}
 

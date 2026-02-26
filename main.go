@@ -220,7 +220,7 @@ Flags:
 	}
 
 	// Encode to TOON
-	output := toon.Encode(rm)
+	output := toon.Encode(rm, focused)
 
 	// Write cache (skip when filter flags are active — filtered output must not
 	// overwrite the full-map cache).

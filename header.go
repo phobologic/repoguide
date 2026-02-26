@@ -78,6 +78,7 @@ const headerFocused = `# Focused query — callers, callsites, and dependencies
 
 - **callsites**: every call or import occurrence — ` + "`caller`" + ` = calling function, or ` + "`<import>`" + ` for file-level imports
 - **dependencies**: cross-file imports — ` + "`source`" + ` imports ` + "`target`" + `
+- **Do not pipe this output through ` + "`head`" + ` or ` + "`tail`" + `** — the complete output is the value.
 
 ---`
 
