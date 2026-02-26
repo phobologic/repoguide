@@ -172,7 +172,7 @@ Flags:
 	if !filterActive && cachePath != "" && cacheIsFresh(cachePath, root, files) {
 		data, err := os.ReadFile(cachePath)
 		if err == nil {
-			writeOutput(stdout, strings.TrimRight(string(data), "\n"), raw)
+			writeOutput(stdout, strings.TrimRight(string(data), "\n"), raw, withTests)
 			return nil
 		}
 	}
@@ -228,7 +228,7 @@ Flags:
 		_ = os.WriteFile(cachePath, []byte(output+"\n"), 0o644)
 	}
 
-	writeOutput(stdout, output, raw)
+	writeOutput(stdout, output, raw, withTests)
 	return nil
 }
 
