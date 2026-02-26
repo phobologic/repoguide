@@ -129,7 +129,7 @@ func TestFilterBySymbolMatch(t *testing.T) {
 	t.Parallel()
 
 	rm := makeFilterRepoMap()
-	got := FilterBySymbol(rm, "Foo")
+	got := FilterBySymbol(rm, "Foo", false)
 
 	// Foo is in a.go; Foo calls Baz (b.go) and is called by Qux (c.go) — all 3 files included.
 	if len(got.Files) != 3 {
@@ -149,7 +149,7 @@ func TestFilterBySymbolNoMatch(t *testing.T) {
 	t.Parallel()
 
 	rm := makeFilterRepoMap()
-	got := FilterBySymbol(rm, "NoSuchSymbol")
+	got := FilterBySymbol(rm, "NoSuchSymbol", false)
 
 	if len(got.Files) != 0 {
 		t.Errorf("expected 0 files, got %d", len(got.Files))
@@ -166,7 +166,7 @@ func TestFilterBySymbolCaseInsensitive(t *testing.T) {
 	t.Parallel()
 
 	rm := makeFilterRepoMap()
-	got := FilterBySymbol(rm, "foo") // lowercase matches "Foo"
+	got := FilterBySymbol(rm, "foo", false) // lowercase matches "Foo"
 
 	if len(got.Files) == 0 {
 		t.Fatal("expected matches for lowercase 'foo'")
@@ -188,7 +188,7 @@ func TestFilterBySymbolSubstring(t *testing.T) {
 
 	rm := makeFilterRepoMap()
 	// "ba" matches both "Bar" (a.go) and "Baz" (b.go).
-	got := FilterBySymbol(rm, "ba")
+	got := FilterBySymbol(rm, "ba", false)
 
 	if len(got.Files) < 2 {
 		t.Fatalf("expected at least 2 files for 'ba', got %d: %v", len(got.Files), fileNames(got))
@@ -200,7 +200,7 @@ func TestFilterBySymbolCallExpansion(t *testing.T) {
 
 	rm := makeFilterRepoMap()
 	// Filter for Baz (defined in b.go). Foo calls Baz, so a.go should be included.
-	got := FilterBySymbol(rm, "Baz")
+	got := FilterBySymbol(rm, "Baz", false)
 
 	paths := make(map[string]bool)
 	for _, f := range got.Files {
@@ -220,7 +220,7 @@ func TestFilterBySymbolDepsEitherEndpoint(t *testing.T) {
 	rm := makeFilterRepoMap()
 	// Filter for Baz (b.go). a.go→b.go dep should be included even though a.go
 	// is included only via expansion (its caller Foo calls Baz).
-	got := FilterBySymbol(rm, "Baz")
+	got := FilterBySymbol(rm, "Baz", false)
 
 	found := false
 	for _, d := range got.Dependencies {
@@ -302,7 +302,7 @@ func TestFilterBySymbolCallSites(t *testing.T) {
 	t.Parallel()
 
 	rm := makeFilterRepoMap()
-	got := FilterBySymbol(rm, "Foo")
+	got := FilterBySymbol(rm, "Foo", false)
 
 	// Foo is caller in Foo→Baz (lines 10, 20) and callee in Qux→Foo (line 5)
 	if len(got.CallSites) != 3 {
@@ -317,10 +317,115 @@ func TestFilterBySymbolCallSitesNoMatch(t *testing.T) {
 
 	rm := makeFilterRepoMap()
 	// Bar has no call edges or sites in the fixture.
-	got := FilterBySymbol(rm, "Bar")
+	got := FilterBySymbol(rm, "Bar", false)
 
 	if len(got.CallSites) != 0 {
 		t.Fatalf("expected 0 call sites, got %d: %+v", len(got.CallSites), got.CallSites)
+	}
+}
+
+// makeFieldRepoMap builds a RepoMap with class and field tags for members tests.
+// models.go defines MyStruct (class) with ID and Name fields, and a Helper function.
+// utils.go defines OtherStruct (class) with Count field.
+func makeFieldRepoMap() *model.RepoMap {
+	return &model.RepoMap{
+		RepoName: "test",
+		Root:     "test",
+		Files: []model.FileInfo{
+			{
+				Path: "models.go", Language: "go", Rank: 0.5,
+				Tags: []model.Tag{
+					{Name: "MyStruct", Kind: model.Definition, SymbolKind: model.Class, Line: 1, File: "models.go"},
+					{Name: "MyStruct.ID", Kind: model.Definition, SymbolKind: model.Field, Line: 2, File: "models.go", Signature: "ID int"},
+					{Name: "MyStruct.Name", Kind: model.Definition, SymbolKind: model.Field, Line: 3, File: "models.go", Signature: "Name string"},
+					{Name: "Helper", Kind: model.Definition, SymbolKind: model.Function, Line: 10, File: "models.go"},
+				},
+			},
+			{
+				Path: "utils.go", Language: "go", Rank: 0.3,
+				Tags: []model.Tag{
+					{Name: "OtherStruct", Kind: model.Definition, SymbolKind: model.Class, Line: 1, File: "utils.go"},
+					{Name: "OtherStruct.Count", Kind: model.Definition, SymbolKind: model.Field, Line: 2, File: "utils.go", Signature: "Count int"},
+				},
+			},
+		},
+	}
+}
+
+// TestFilterBySymbolWithMembersClass verifies that matching a class with
+// withMembers=true populates rm.Members with that class's field tags.
+func TestFilterBySymbolWithMembersClass(t *testing.T) {
+	t.Parallel()
+
+	rm := makeFieldRepoMap()
+	got := FilterBySymbol(rm, "MyStruct", true)
+
+	// Symbols table should show MyStruct (class only, no fields).
+	if len(got.Files) != 1 || got.Files[0].Path != "models.go" {
+		t.Fatalf("expected models.go only, got %v", fileNames(got))
+	}
+	for _, tag := range got.Files[0].Tags {
+		if tag.SymbolKind == model.Field {
+			t.Errorf("field tag %q should not appear in symbols table", tag.Name)
+		}
+	}
+
+	// Members should contain MyStruct's two fields.
+	if len(got.Members) != 2 {
+		t.Fatalf("expected 2 members, got %d: %+v", len(got.Members), got.Members)
+	}
+	names := map[string]bool{}
+	for _, m := range got.Members {
+		names[m.Name] = true
+	}
+	if !names["MyStruct.ID"] || !names["MyStruct.Name"] {
+		t.Errorf("expected MyStruct.ID and MyStruct.Name, got %v", got.Members)
+	}
+}
+
+// TestFilterBySymbolWithoutMembersClass verifies that withMembers=false leaves
+// rm.Members empty even when a class is matched.
+func TestFilterBySymbolWithoutMembersClass(t *testing.T) {
+	t.Parallel()
+
+	rm := makeFieldRepoMap()
+	got := FilterBySymbol(rm, "MyStruct", false)
+
+	if len(got.Members) != 0 {
+		t.Fatalf("expected no members with withMembers=false, got %d", len(got.Members))
+	}
+}
+
+// TestFilterBySymbolMemberFallback verifies that when no top-level symbol
+// matches, withMembers=true falls back to searching field names.
+func TestFilterBySymbolMemberFallback(t *testing.T) {
+	t.Parallel()
+
+	rm := makeFieldRepoMap()
+	// "Count" is not a top-level symbol — it's OtherStruct.Count.
+	got := FilterBySymbol(rm, "Count", true)
+
+	if len(got.Members) != 1 {
+		t.Fatalf("expected 1 member from fallback, got %d: %+v", len(got.Members), got.Members)
+	}
+	if got.Members[0].Name != "OtherStruct.Count" {
+		t.Errorf("expected OtherStruct.Count, got %q", got.Members[0].Name)
+	}
+}
+
+// TestFilterBySymbolMemberFallbackNoMatch verifies that fallback returns empty
+// when the field name also doesn't match anything.
+func TestFilterBySymbolMemberFallbackNoMatch(t *testing.T) {
+	t.Parallel()
+
+	rm := makeFieldRepoMap()
+	got := FilterBySymbol(rm, "NonExistent", true)
+
+	if len(got.Members) != 0 {
+		t.Errorf("expected no members, got %d", len(got.Members))
+	}
+	if len(got.Files) != 0 {
+		t.Errorf("expected no files, got %v", fileNames(got))
 	}
 }
 

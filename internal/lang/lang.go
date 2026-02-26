@@ -43,6 +43,11 @@ type Language struct {
 	// for a call-site node (e.g., "MyType.Method" or "funcName").
 	// Returns "" if the call is at top-level or inside an anonymous function.
 	FindEnclosingDef func(node *sitter.Node, source []byte) string
+
+	// FindEnclosingType returns the type name that owns a field/member node
+	// (e.g. the struct or class containing a field declaration). Returns ""
+	// if the node is not inside a named type definition.
+	FindEnclosingType func(node *sitter.Node, source []byte) string
 }
 
 // GetLanguage returns the tree-sitter Language pointer.

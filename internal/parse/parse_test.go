@@ -597,3 +597,164 @@ func filterRefs(tags []model.Tag) []model.Tag {
 	}
 	return out
 }
+
+func filterFields(tags []model.Tag) []model.Tag {
+	var out []model.Tag
+	for _, t := range tags {
+		if t.Kind == model.Definition && t.SymbolKind == model.Field {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// --- Field extraction tests ---
+
+func TestGoStructFields(t *testing.T) {
+	t.Parallel()
+	_, extract := setup(t, "go")
+
+	src := `package p
+
+type Beat struct {
+	ID       int
+	SceneID  int
+	Status   string
+}
+`
+	tags := filterFields(extract(src))
+	if len(tags) != 3 {
+		t.Fatalf("expected 3 field tags, got %d: %+v", len(tags), tags)
+	}
+	byName := map[string]model.Tag{}
+	for _, tag := range tags {
+		byName[tag.Name] = tag
+	}
+	for _, tc := range []struct {
+		name string
+		sig  string
+	}{
+		{"Beat.ID", "ID int"},
+		{"Beat.SceneID", "SceneID int"},
+		{"Beat.Status", "Status string"},
+	} {
+		tag, ok := byName[tc.name]
+		if !ok {
+			t.Errorf("missing field %q", tc.name)
+			continue
+		}
+		if tag.SymbolKind != model.Field {
+			t.Errorf("%s: kind = %q, want field", tc.name, tag.SymbolKind)
+		}
+		if tag.Signature != tc.sig {
+			t.Errorf("%s: sig = %q, want %q", tc.name, tag.Signature, tc.sig)
+		}
+	}
+}
+
+func TestGoInterfaceMethods(t *testing.T) {
+	t.Parallel()
+	_, extract := setup(t, "go")
+
+	src := `package p
+
+type Writer interface {
+	Write(p []byte) (n int, err error)
+	Close() error
+}
+`
+	tags := filterFields(extract(src))
+	if len(tags) != 2 {
+		t.Fatalf("expected 2 interface method tags, got %d: %+v", len(tags), tags)
+	}
+	names := map[string]bool{}
+	for _, tag := range tags {
+		names[tag.Name] = true
+	}
+	if !names["Writer.Write"] || !names["Writer.Close"] {
+		t.Errorf("unexpected field names: %v", names)
+	}
+}
+
+func TestGoFieldsNotCapturedOutsideStruct(t *testing.T) {
+	t.Parallel()
+	_, extract := setup(t, "go")
+
+	// Standalone function — no fields should be captured.
+	src := `package p
+
+func Foo(x int) string {
+	return ""
+}
+`
+	tags := filterFields(extract(src))
+	if len(tags) != 0 {
+		t.Errorf("expected no field tags outside struct, got %d: %+v", len(tags), tags)
+	}
+}
+
+func TestPythonClassFields(t *testing.T) {
+	t.Parallel()
+	_, extract := setup(t, "python")
+
+	src := `class Beat:
+    id: int = 0
+    name = "default"
+`
+	tags := filterFields(extract(src))
+	if len(tags) != 2 {
+		t.Fatalf("expected 2 field tags, got %d: %+v", len(tags), tags)
+	}
+	byName := map[string]model.Tag{}
+	for _, tag := range tags {
+		byName[tag.Name] = tag
+	}
+	if tag, ok := byName["Beat.id"]; !ok {
+		t.Error("missing Beat.id")
+	} else if tag.Signature != "id: int" {
+		t.Errorf("Beat.id sig = %q, want %q", tag.Signature, "id: int")
+	}
+	if _, ok := byName["Beat.name"]; !ok {
+		t.Error("missing Beat.name")
+	}
+}
+
+func TestPythonFieldsNotCapturedInMethod(t *testing.T) {
+	t.Parallel()
+	_, extract := setup(t, "python")
+
+	// Assignments inside a method should NOT be captured as fields.
+	src := `class Foo:
+    def bar(self):
+        x = 1
+        return x
+`
+	tags := filterFields(extract(src))
+	if len(tags) != 0 {
+		t.Errorf("expected no field tags for method-local assignments, got %d: %+v", len(tags), tags)
+	}
+}
+
+func TestRubyAttrFields(t *testing.T) {
+	t.Parallel()
+	_, extract := setup(t, "ruby")
+
+	src := `class Beat
+  attr_accessor :id, :name
+  attr_reader :status
+end
+`
+	tags := filterFields(extract(src))
+	if len(tags) != 3 {
+		t.Fatalf("expected 3 field tags, got %d: %+v", len(tags), tags)
+	}
+	names := map[string]bool{}
+	for _, tag := range tags {
+		names[tag.Name] = true
+	}
+	for _, want := range []string{"Beat.id", "Beat.name", "Beat.status"} {
+		if !names[want] {
+			t.Errorf("missing field %q; got %v", want, names)
+		}
+	}
+}

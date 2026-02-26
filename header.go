@@ -77,6 +77,7 @@ comma-separated values.
 const headerFocused = `# Focused query — callers, callsites, and dependencies
 
 - **callsites**: every call or import occurrence — ` + "`caller`" + ` = calling function, or ` + "`<import>`" + ` for file-level imports
+- **members**: fields and methods of matched class/struct definitions (only present with ` + "`--members`" + `)
 - **dependencies**: cross-file imports — ` + "`source`" + ` imports ` + "`target`" + `
 - **Do not pipe this output through ` + "`head`" + ` or ` + "`tail`" + `** — the complete output is the value.
 

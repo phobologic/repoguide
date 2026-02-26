@@ -6,6 +6,13 @@
 (function_definition
   name: (identifier) @name) @definition.function
 
+;; Class attribute assignments: x = value  OR  x: Type = value
+(class_definition
+  body: (block
+    (expression_statement
+      (assignment
+        left: (identifier) @name) @definition.field)))
+
 ;; Function and method calls
 (call
   function: [

@@ -15,6 +15,7 @@ var captureMap = map[string]struct {
 	SymbolKind model.SymbolKind
 }{
 	"definition.class":    {model.Definition, model.Class},
+	"definition.field":    {model.Definition, model.Field},
 	"definition.function": {model.Definition, model.Function},
 	"definition.method":   {model.Definition, model.Method},
 	"reference.call":      {model.Reference, model.Function},
@@ -72,16 +73,35 @@ func ExtractTags(l *lang.Language, parser *sitter.Parser, query *sitter.Query, s
 		symbolKind := cm.SymbolKind
 		nameText := lang.NodeText(nameNode, source)
 
+		// Ruby attr_accessor: the name node is a simple_symbol like ":foo" — strip the colon.
+		if nameNode.Type() == "simple_symbol" && len(nameText) > 0 && nameText[0] == ':' {
+			nameText = nameText[1:]
+		}
+
 		effectiveName := nameText
 
-		// Go-style: query captured @definition.method directly
-		if tagKind == model.Definition && symbolKind == model.Method {
+		switch {
+		case tagKind == model.Definition && symbolKind == model.Field:
+			// Qualify the field name as "TypeName.fieldName".
+			// If FindEnclosingType returns "", skip the tag (not a class member).
+			if l.FindEnclosingType == nil {
+				continue
+			}
+			typeName := l.FindEnclosingType(defNode, source)
+			if typeName == "" {
+				continue
+			}
+			effectiveName = typeName + "." + nameText
+
+		case tagKind == model.Definition && symbolKind == model.Method:
+			// Go-style: query captured @definition.method directly
 			if l.FindReceiverType != nil {
 				if recv := l.FindReceiverType(defNode, source); recv != "" {
 					effectiveName = recv + "." + nameText
 				}
 			}
-		} else if tagKind == model.Definition && symbolKind == model.Function {
+
+		case tagKind == model.Definition && symbolKind == model.Function:
 			// Python/Ruby-style: check if function is inside a class
 			if l.FindMethodClass != nil {
 				if cls := l.FindMethodClass(defNode, source); cls != "" {

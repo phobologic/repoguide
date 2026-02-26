@@ -110,6 +110,7 @@ repoguide --cache .repoguide-cache /repo     # cache + explicit path
 
 repoguide --with-tests                       # include test files (excluded by default)
 repoguide --symbol BuildGraph                # focused: symbol + its callers/callees
+repoguide --symbol RepoMap --members         # focused: symbol + its fields/methods
 repoguide --file internal/auth               # focused: symbols and deps for a path
 repoguide --symbol Handle --file server      # focused: combine filters (AND)
 ` + "```" + `
@@ -149,31 +150,44 @@ below). These bypass the cache read but write back to it, so full runs stay fast
    Use the line numbers directly with ` + "`Read(offset=N, limit=10)`" + ` rather than
    scanning raw Grep output.
 
-4. **To find all files that depend on a module or path, use ` + "`--file <path>`" + `.** The
+4. **To understand the shape of a class, struct, or interface, use
+   ` + "`repoguide --symbol <TypeName> --members`" + `.** The output includes a ` + "`members`" + `
+   table listing all fields and methods with exact line numbers and type signatures.
+   Use those line numbers with ` + "`Read(offset=N, limit=5)`" + ` to read just the members
+   you care about, rather than reading the whole file.
+
+5. **For member-level lookups (fields or methods on a specific type), use
+   ` + "`repoguide --symbol TypeName.member --members`" + ` or
+   ` + "`repoguide --symbol member_name --members`" + ` as a first pass.** The dotted
+   form finds a specific member; the plain name falls back to searching all
+   member names if no top-level definition matches. Fall back to Grep only if
+   the member is not found — e.g., it is private/unexported or defined dynamically.
+
+6. **To find all files that depend on a module or path, use ` + "`--file <path>`" + `.** The
    ` + "`dependencies`" + ` table in the output lists every importer: ` + "`source`" + ` imports
    ` + "`target`" + `. Example: ` + "`repoguide --file loom/ai/stubs`" + ` shows every file that
    imports from that module. Use this for "I'm replacing X — who depends on it?"
    instead of Grep.
 
-5. **Use the ` + "`callsites`" + ` table for precise file navigation.** Focused queries
+7. **Use the ` + "`callsites`" + ` table for precise file navigation.** Focused queries
    (` + "`--symbol`" + ` or ` + "`--file`" + `) include a ` + "`callsites[N]{caller,callee,file,line}`" + ` table
    with the exact line of every call occurrence. Use those line numbers for
    ` + "`Read(offset=N, limit=10)`" + ` instead of scanning from a rough offset.
 
-6. **Use the ` + "`symbols`" + ` table as a lookup index, not a scanning surface.** It
+8. **Use the ` + "`symbols`" + ` table as a lookup index, not a scanning surface.** It
    lists every exported definition with file and line. Look up a name you already
    know — don't scroll through it searching for something.
 
-7. **Use ` + "`--file`" + ` when focused on a subsystem.** ` + "`repoguide --file internal/auth`" + `
+9. **Use ` + "`--file`" + ` when focused on a subsystem.** ` + "`repoguide --file internal/auth`" + `
    gives all symbols and dependencies for that path without full-map noise.
    Combine with ` + "`--symbol`" + ` (AND semantics) when a name appears across packages.
 
-8. **Fall back to Grep for: string literal searches, unexported names (repoguide
-   only indexes exported definitions), or searching within a file you've already
-   identified.**
+10. **Fall back to Grep for: string literal searches, unexported names (repoguide
+    only indexes exported definitions), or searching within a file you've already
+    identified.**
 
-9. **Re-run after large structural changes.** The map is a snapshot. If you've
-   added new files or significantly restructured imports, re-run to refresh it.`
+11. **Re-run after large structural changes.** The map is a snapshot. If you've
+    added new files or significantly restructured imports, re-run to refresh it.`
 
 	return sentinelStart + "\n" + body + "\n" + sentinelEnd
 }

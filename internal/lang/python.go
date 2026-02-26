@@ -9,12 +9,13 @@ import (
 
 func init() {
 	Languages["python"] = &Language{
-		Name:             "python",
-		Extensions:       []string{".py"},
-		lang:             python.GetLanguage(),
-		FindMethodClass:  pythonFindMethodClass,
-		ExtractSignature: pythonExtractSignature,
-		FindEnclosingDef: pythonFindEnclosingDef,
+		Name:              "python",
+		Extensions:        []string{".py"},
+		lang:              python.GetLanguage(),
+		FindMethodClass:   pythonFindMethodClass,
+		ExtractSignature:  pythonExtractSignature,
+		FindEnclosingDef:  pythonFindEnclosingDef,
+		FindEnclosingType: pythonFindEnclosingType,
 	}
 }
 
@@ -91,6 +92,9 @@ func pythonExtractSignature(defNode *sitter.Node, kind model.SymbolKind, source 
 	if kind == model.Class {
 		return pythonExtractClassSignature(defNode, source)
 	}
+	if kind == model.Field {
+		return pythonExtractFieldSignature(defNode, source)
+	}
 	return pythonExtractFunctionSignature(defNode, source)
 }
 
@@ -109,6 +113,57 @@ func pythonExtractClassSignature(node *sitter.Node, source []byte) string {
 		return name + args
 	}
 	return name
+}
+
+// pythonFindEnclosingType walks up from a field node to find the enclosing
+// class_definition and returns its name. Returns "" if not inside a class,
+// or if inside a function/method body (not a class-level attribute).
+func pythonFindEnclosingType(node *sitter.Node, source []byte) string {
+	current := node.Parent()
+	for current != nil {
+		switch current.Type() {
+		case "class_definition":
+			for i := 0; i < int(current.ChildCount()); i++ {
+				child := current.Child(i)
+				if child.Type() == "identifier" {
+					return NodeText(child, source)
+				}
+			}
+		case "function_definition":
+			// Inside a method body — not a class-level attribute.
+			return ""
+		}
+		current = current.Parent()
+	}
+	return ""
+}
+
+// pythonExtractFieldSignature extracts a signature for a class field.
+// In this grammar version, annotated assignments (x: Type = val) are represented
+// as an assignment node with a "type" child. Returns "name: type" when a type
+// annotation is present, otherwise just "name".
+func pythonExtractFieldSignature(node *sitter.Node, source []byte) string {
+	if node.Type() == "assignment" {
+		var name, annotation string
+		for i := 0; i < int(node.ChildCount()); i++ {
+			child := node.Child(i)
+			switch child.Type() {
+			case "identifier":
+				if name == "" {
+					name = NodeText(child, source)
+				}
+			case "type":
+				annotation = NodeText(child, source)
+			}
+		}
+		if name != "" && annotation != "" {
+			return name + ": " + annotation
+		}
+		if name != "" {
+			return name
+		}
+	}
+	return CollapseWhitespace(NodeText(node, source))
 }
 
 func pythonExtractFunctionSignature(node *sitter.Node, source []byte) string {

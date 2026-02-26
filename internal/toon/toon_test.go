@@ -216,3 +216,60 @@ func TestEncodeCallSites(t *testing.T) {
 		t.Errorf("missing second call site:\n%s", got)
 	}
 }
+
+func TestEncodeMembers(t *testing.T) {
+	t.Parallel()
+
+	rm := &model.RepoMap{
+		RepoName: "r",
+		Root:     "r",
+		Files: []model.FileInfo{
+			{Path: "m.go", Language: "go", Rank: 0.5,
+				Tags: []model.Tag{
+					{Name: "MyStruct", Kind: model.Definition, SymbolKind: model.Class, Line: 1},
+				},
+			},
+		},
+		Members: []model.Tag{
+			{Name: "MyStruct.ID", Kind: model.Definition, SymbolKind: model.Field, Line: 2, Signature: "ID int"},
+			{Name: "MyStruct.Name", Kind: model.Definition, SymbolKind: model.Field, Line: 3, Signature: "Name string"},
+		},
+	}
+
+	// Focused mode: members appear before symbols.
+	got := Encode(rm, true)
+	membersIdx := strings.Index(got, "members[2]")
+	symbolsIdx := strings.Index(got, "symbols[1]")
+	if membersIdx < 0 {
+		t.Fatalf("members table missing in focused mode:\n%s", got)
+	}
+	if symbolsIdx < 0 {
+		t.Fatalf("symbols table missing:\n%s", got)
+	}
+	if membersIdx > symbolsIdx {
+		t.Errorf("members should appear before symbols in focused mode")
+	}
+	if !strings.Contains(got, "members[2]{name,kind,line,signature}:") {
+		t.Errorf("missing members header:\n%s", got)
+	}
+	// Names in members table should be unqualified.
+	if !strings.Contains(got, "  ID,field,2,ID int") {
+		t.Errorf("missing ID member row:\n%s", got)
+	}
+	if !strings.Contains(got, "  Name,field,3,Name string") {
+		t.Errorf("missing Name member row:\n%s", got)
+	}
+
+	// Non-focused mode: members table still appears (at end).
+	got2 := Encode(rm, false)
+	if !strings.Contains(got2, "members[2]{name,kind,line,signature}:") {
+		t.Errorf("members table missing in non-focused mode:\n%s", got2)
+	}
+
+	// No members: table must not appear.
+	rm2 := &model.RepoMap{RepoName: "r", Root: "r"}
+	got3 := Encode(rm2, true)
+	if strings.Contains(got3, "members") {
+		t.Errorf("members table should not appear when Members is empty:\n%s", got3)
+	}
+}

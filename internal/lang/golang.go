@@ -9,12 +9,13 @@ import (
 
 func init() {
 	Languages["go"] = &Language{
-		Name:             "go",
-		Extensions:       []string{".go"},
-		lang:             golang.GetLanguage(),
-		FindReceiverType: goFindReceiverType,
-		ExtractSignature: goExtractSignature,
-		FindEnclosingDef: goFindEnclosingDef,
+		Name:              "go",
+		Extensions:        []string{".go"},
+		lang:              golang.GetLanguage(),
+		FindReceiverType:  goFindReceiverType,
+		ExtractSignature:  goExtractSignature,
+		FindEnclosingDef:  goFindEnclosingDef,
+		FindEnclosingType: goFindEnclosingType,
 	}
 }
 
@@ -71,6 +72,11 @@ func goExtractSignature(defNode *sitter.Node, kind model.SymbolKind, source []by
 			}
 		}
 		return ""
+	}
+
+	if kind == model.Field {
+		// Struct field or interface method: return the full declaration text collapsed.
+		return CollapseWhitespace(NodeText(defNode, source))
 	}
 
 	// Function or method
@@ -132,6 +138,24 @@ func goFindEnclosingDef(node *sitter.Node, source []byte) string {
 		case "func_literal":
 			// Stop at closure boundaries — don't attribute closure calls to outer func.
 			return ""
+		}
+		current = current.Parent()
+	}
+	return ""
+}
+
+// goFindEnclosingType walks up from a field_declaration or method_elem node to
+// its parent type_spec and returns the type name. Returns "" if not found.
+func goFindEnclosingType(node *sitter.Node, source []byte) string {
+	current := node.Parent()
+	for current != nil {
+		if current.Type() == "type_spec" {
+			for i := 0; i < int(current.ChildCount()); i++ {
+				child := current.Child(i)
+				if child.Type() == "type_identifier" {
+					return NodeText(child, source)
+				}
+			}
 		}
 		current = current.Parent()
 	}

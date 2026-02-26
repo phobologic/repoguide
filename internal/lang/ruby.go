@@ -9,12 +9,13 @@ import (
 
 func init() {
 	Languages["ruby"] = &Language{
-		Name:             "ruby",
-		Extensions:       []string{".rb"},
-		lang:             ruby.GetLanguage(),
-		FindMethodClass:  rubyFindMethodClass,
-		ExtractSignature: rubyExtractSignature,
-		FindEnclosingDef: rubyFindEnclosingDef,
+		Name:              "ruby",
+		Extensions:        []string{".rb"},
+		lang:              ruby.GetLanguage(),
+		FindMethodClass:   rubyFindMethodClass,
+		ExtractSignature:  rubyExtractSignature,
+		FindEnclosingDef:  rubyFindEnclosingDef,
+		FindEnclosingType: rubyFindEnclosingType,
 	}
 }
 
@@ -104,9 +105,25 @@ func rubyClassName(node *sitter.Node, source []byte) string {
 	return ""
 }
 
+// rubyFindEnclosingType walks up from a call node (attr_accessor etc.) to find
+// the enclosing class or module name. Returns "" if not inside a class/module.
+func rubyFindEnclosingType(node *sitter.Node, source []byte) string {
+	current := node.Parent()
+	for current != nil {
+		if current.Type() == "class" || current.Type() == "module" {
+			return rubyClassName(current, source)
+		}
+		current = current.Parent()
+	}
+	return ""
+}
+
 func rubyExtractSignature(defNode *sitter.Node, kind model.SymbolKind, source []byte) string {
 	if kind == model.Class {
 		return rubyExtractClassSignature(defNode, source)
+	}
+	if kind == model.Field {
+		return rubyExtractFieldSignature(defNode, source)
 	}
 	return rubyExtractMethodSignature(defNode, source)
 }
@@ -134,6 +151,21 @@ func rubyExtractClassSignature(node *sitter.Node, source []byte) string {
 		return name + " < " + superclass
 	}
 	return name
+}
+
+// rubyExtractFieldSignature returns the signature for an attr_accessor/reader/writer
+// field. The defNode is the call expression; we extract the method name to form
+// e.g. "attr_accessor :field_name".
+func rubyExtractFieldSignature(defNode *sitter.Node, source []byte) string {
+	var methodName string
+	for i := 0; i < int(defNode.ChildCount()); i++ {
+		child := defNode.Child(i)
+		if child.Type() == "identifier" {
+			methodName = NodeText(child, source)
+			break
+		}
+	}
+	return methodName
 }
 
 func rubyExtractMethodSignature(node *sitter.Node, source []byte) string {

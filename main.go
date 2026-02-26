@@ -53,6 +53,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 		showVersion  bool
 		raw          bool
 		withTests    bool
+		withMembers  bool
 		symbolFilter string
 		fileFilter   string
 	)
@@ -67,6 +68,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	fs.BoolVar(&showVersion, "version", false, "show version and exit")
 	fs.BoolVar(&raw, "raw", false, "output raw TOON without agent context header")
 	fs.BoolVar(&withTests, "with-tests", false, "include test files in output (excluded by default)")
+	fs.BoolVar(&withMembers, "members", false, "include member fields/methods for matched class symbols (use with --symbol)")
 	fs.StringVar(&symbolFilter, "symbol", "", "filter output to symbols matching this `substring` (case-insensitive)")
 	fs.StringVar(&fileFilter, "file", "", "filter output to files matching this `substring` (case-insensitive)")
 
@@ -213,7 +215,7 @@ Flags:
 		rm.CallSites = graph.BuildCallSites(fileInfos)
 	}
 	if symbolFilter != "" {
-		rm = ranking.FilterBySymbol(rm, symbolFilter)
+		rm = ranking.FilterBySymbol(rm, symbolFilter, withMembers)
 	}
 	if fileFilter != "" {
 		rm = ranking.FilterByFile(rm, fileFilter)

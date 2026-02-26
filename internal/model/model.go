@@ -14,6 +14,7 @@ type SymbolKind string
 
 const (
 	Class    SymbolKind = "class"
+	Field    SymbolKind = "field"
 	Function SymbolKind = "function"
 	Method   SymbolKind = "method"
 	Module   SymbolKind = "module"
@@ -70,4 +71,7 @@ type RepoMap struct {
 	Dependencies []Dependency
 	CallEdges    []CallEdge
 	CallSites    []CallSite
+	// Members holds field/method tags for focused --symbol --members queries.
+	// Empty in full-map mode.
+	Members []Tag
 }

@@ -71,18 +71,47 @@ func SelectFiles(rm *model.RepoMap, maxFiles int) *model.RepoMap {
 // contains substr (case-insensitive), the files that define those symbols,
 // files that define their direct callers and callees, and the edges that
 // connect them.
-func FilterBySymbol(rm *model.RepoMap, substr string) *model.RepoMap {
+//
+// When withMembers is true and a matched symbol is a class/struct, the members
+// table of the returned RepoMap is populated with that class's field tags.
+// If no top-level definitions match, withMembers triggers a fallback search
+// over member names (the unqualified part after ".").
+func FilterBySymbol(rm *model.RepoMap, substr string, withMembers bool) *model.RepoMap {
 	lower := strings.ToLower(substr)
 
-	// Find matched symbols and their files.
+	// Find matched symbols and their files, excluding field tags from the primary
+	// symbol match (fields are handled separately via the members mechanism).
 	matchedSymbols := make(map[string]struct{})
 	matchedFiles := make(map[string]struct{})
 	for i := range rm.Files {
 		for j := range rm.Files[i].Tags {
 			tag := &rm.Files[i].Tags[j]
-			if tag.Kind == model.Definition && strings.Contains(strings.ToLower(tag.Name), lower) {
+			if tag.Kind == model.Definition && tag.SymbolKind != model.Field &&
+				strings.Contains(strings.ToLower(tag.Name), lower) {
 				matchedSymbols[tag.Name] = struct{}{}
 				matchedFiles[rm.Files[i].Path] = struct{}{}
+			}
+		}
+	}
+
+	// Member fallback: if no top-level defs matched and withMembers is requested,
+	// search field tags whose unqualified name (part after ".") contains substr.
+	// Include the owning class in matched symbols for context.
+	if withMembers && len(matchedSymbols) == 0 {
+		for i := range rm.Files {
+			for j := range rm.Files[i].Tags {
+				tag := &rm.Files[i].Tags[j]
+				if tag.Kind != model.Definition || tag.SymbolKind != model.Field {
+					continue
+				}
+				unqualified := tag.Name
+				if dot := strings.LastIndex(tag.Name, "."); dot >= 0 {
+					unqualified = tag.Name[dot+1:]
+				}
+				if strings.Contains(strings.ToLower(unqualified), lower) {
+					matchedSymbols[tag.Name] = struct{}{}
+					matchedFiles[rm.Files[i].Path] = struct{}{}
+				}
 			}
 		}
 	}
@@ -115,11 +144,12 @@ func FilterBySymbol(rm *model.RepoMap, substr string) *model.RepoMap {
 			fi := rm.Files[i]
 			// Trim tags to only the matched and related definitions so the
 			// symbols table stays focused rather than dumping all exports from
-			// every matched file.
+			// every matched file. Field tags are never shown in the symbols
+			// table — they appear in the members table instead.
 			var filteredTags []model.Tag
 			for j := range fi.Tags {
 				tag := &fi.Tags[j]
-				if tag.Kind != model.Definition {
+				if tag.Kind != model.Definition || tag.SymbolKind == model.Field {
 					continue
 				}
 				_, isMatched := matchedSymbols[tag.Name]
@@ -130,6 +160,44 @@ func FilterBySymbol(rm *model.RepoMap, substr string) *model.RepoMap {
 			}
 			fi.Tags = filteredTags
 			files = append(files, fi)
+		}
+	}
+
+	// Collect members when requested.
+	var members []model.Tag
+	if withMembers {
+		// Phase A: for each matched class symbol, include all its field tags.
+		for i := range rm.Files {
+			for j := range rm.Files[i].Tags {
+				tag := &rm.Files[i].Tags[j]
+				if tag.Kind != model.Definition || tag.SymbolKind != model.Field {
+					continue
+				}
+				// Check if the owning type (prefix before ".") is a matched class.
+				dot := strings.LastIndex(tag.Name, ".")
+				if dot < 0 {
+					continue
+				}
+				ownerName := tag.Name[:dot]
+				if _, ok := matchedSymbols[ownerName]; ok {
+					members = append(members, *tag)
+				}
+			}
+		}
+		// Phase B: for fallback-matched field tags (field names directly in
+		// matchedSymbols), include them if not already added via Phase A.
+		if len(members) == 0 {
+			for i := range rm.Files {
+				for j := range rm.Files[i].Tags {
+					tag := &rm.Files[i].Tags[j]
+					if tag.Kind != model.Definition || tag.SymbolKind != model.Field {
+						continue
+					}
+					if _, ok := matchedSymbols[tag.Name]; ok {
+						members = append(members, *tag)
+					}
+				}
+			}
 		}
 	}
 
@@ -170,6 +238,7 @@ func FilterBySymbol(rm *model.RepoMap, substr string) *model.RepoMap {
 		Dependencies: deps,
 		CallEdges:    callEdges,
 		CallSites:    callSites,
+		Members:      members,
 	}
 }
 

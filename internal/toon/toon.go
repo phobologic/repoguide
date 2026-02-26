@@ -40,10 +40,13 @@ func Encode(rm *model.RepoMap, focused bool) string {
 	}
 	parts = append(parts, formatTabular("files", []string{"path", "language", "rank"}, fileRows))
 
-	// In focused mode, callsites come before symbols — they are the primary
-	// deliverable and must survive truncation.
+	// In focused mode, callsites and members come before symbols — they are the
+	// primary deliverables and must survive truncation.
 	if focused && len(rm.CallSites) > 0 {
 		parts = append(parts, encodeSites(rm.CallSites))
+	}
+	if focused && len(rm.Members) > 0 {
+		parts = append(parts, encodeMembers(rm.Members))
 	}
 
 	var symbolRows [][]string
@@ -82,12 +85,31 @@ func Encode(rm *model.RepoMap, focused bool) string {
 	}
 	parts = append(parts, formatTabular("calls", []string{"caller", "callee"}, callRows))
 
-	// In non-focused mode, callsites appear at the end (empty for full maps).
+	// In non-focused mode, callsites and members appear at the end (empty for full maps).
 	if !focused && len(rm.CallSites) > 0 {
 		parts = append(parts, encodeSites(rm.CallSites))
 	}
+	if !focused && len(rm.Members) > 0 {
+		parts = append(parts, encodeMembers(rm.Members))
+	}
 
 	return strings.Join(parts, "\n")
+}
+
+// encodeMembers renders the members table for field/method tags.
+// Names are unqualified (the part after the last ".") since the owning type
+// is shown in the symbols table above.
+func encodeMembers(members []model.Tag) string {
+	rows := make([][]string, len(members))
+	for i := range members {
+		m := &members[i]
+		name := m.Name
+		if dot := strings.LastIndex(m.Name, "."); dot >= 0 {
+			name = m.Name[dot+1:]
+		}
+		rows[i] = []string{name, string(m.SymbolKind), fmt.Sprintf("%d", m.Line), m.Signature}
+	}
+	return formatTabular("members", []string{"name", "kind", "line", "signature"}, rows)
 }
 
 func encodeSites(sites []model.CallSite) string {
