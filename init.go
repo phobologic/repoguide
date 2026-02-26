@@ -118,38 +118,46 @@ but the full output is still written to cache, so subsequent full runs stay fast
 
 **All flags:** ` + "`repoguide --help`" + `
 
-**How to use the output — follow these rules:**
+**How to use the output — two phases:**
+
+**Phase 1 — run once at session start.** The full map orients you to the codebase.
+Read the ` + "`files`" + ` table top-to-bottom: PageRank order shows which files are most
+central. Start reading there, not from directory listings or arbitrary guesses.
+
+**Phase 2 — run ` + "`--symbol`" + ` or ` + "`--file`" + ` for specific mid-task lookups** (rules 2–5
+below). These bypass the cache read but write back to it, so full runs stay fast.
+
+**Rules:**
 
 1. **Read files in ranked order.** The ` + "`files`" + ` table is sorted by PageRank
-   (most central first). Read from the top down — do not start with arbitrary
-   files or directory listings.
+   (most central first). Do not start from directory listings.
 
-2. **Use ` + "`symbols`" + ` instead of Grep to find definitions.** Before running any
-   search for a function, class, or method, check the ` + "`symbols`" + ` table. It
-   lists every exported definition with file and line number.
+2. **When you need to find all callers of a function, use ` + "`--symbol`" + ` instead of
+   Grep.** ` + "`repoguide --symbol <name>`" + ` returns the definition location, every call
+   site with exact file and line number, and the function's callees — in one
+   command. This is the highest-value feature and the clearest case where
+   repoguide beats grep: grep returns raw text; ` + "`--symbol`" + ` returns structured
+   navigation data including line numbers ready for ` + "`Read(offset=N)`" + `.
 
-3. **Use ` + "`dependencies`" + ` to trace call chains.** Before reading a file to
-   understand what it calls or imports, check the ` + "`dependencies`" + ` table first.
-
-4. **Only fall back to Glob/Grep for things repoguide cannot answer** — e.g.,
-   finding all usages of a symbol, or searching within a file you've already
-   identified.
-
-5. **Use ` + "`--symbol`" + ` when you know the name.** Before Grep-ing for a function,
-   run ` + "`repoguide --symbol <name>`" + ` to get its definition, callers, callees, and
-   relevant files in one shot. Faster than searching and more complete.
-
-6. **Use the ` + "`callsites`" + ` table for targeted edits.** Focused queries
+3. **Use the ` + "`callsites`" + ` table for precise file navigation.** Focused queries
    (` + "`--symbol`" + ` or ` + "`--file`" + `) include a ` + "`callsites[N]{caller,callee,file,line}`" + ` table
-   with the exact file and line of every call occurrence. Use these line numbers
-   for precise ` + "`Read(offset=N, limit=10)`" + ` calls instead of scanning from a rough
-   offset. The full map omits this table to keep ambient context lean.
+   with the exact line of every call occurrence. Use those line numbers for
+   ` + "`Read(offset=N, limit=10)`" + ` instead of scanning from a rough offset.
 
-7. **Use ` + "`--file`" + ` when focused on a subsystem.** ` + "`repoguide --file internal/auth`" + `
+4. **Use the ` + "`symbols`" + ` table as a lookup index, not a scanning surface.** It
+   lists every exported definition with file and line. Look up a name you already
+   know — don't scroll through it searching for something.
+
+5. **Use ` + "`--file`" + ` when focused on a subsystem.** ` + "`repoguide --file internal/auth`" + `
    gives all symbols and dependencies for that path without full-map noise.
+   Combine with ` + "`--symbol`" + ` (AND semantics) when a name appears across packages.
 
-8. **Combine filters for precision.** ` + "`--symbol`" + ` and ` + "`--file`" + ` can be used together
-   (AND semantics) when a symbol name is common across packages.`
+6. **Only fall back to Glob/Grep for things repoguide cannot answer** — e.g.,
+   string literal searches, pattern matching on unexported names, or searching
+   within a file you've already identified.
+
+7. **Re-run after large structural changes.** The map is a snapshot. If you've
+   added new files or significantly restructured imports, re-run to refresh it.`
 
 	return sentinelStart + "\n" + body + "\n" + sentinelEnd
 }
