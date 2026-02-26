@@ -121,6 +121,45 @@ func TestDiscoverSymlinksSkipped(t *testing.T) {
 	}
 }
 
+func TestIsTestFile(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		path string
+		want bool
+	}{
+		// Test directory components
+		{"tests/test_scenes.py", true},
+		{"tests/conftest.py", true},
+		{"tests/__init__.py", true},
+		{"spec/models/user_spec.rb", true},
+		{"src/__tests__/foo.js", true},
+		{"src/test/java/FooTest.java", true},
+		{"test/foo_test.exs", true},
+		// Filename patterns
+		{"internal/graph/graph_test.go", true},
+		{"test_helpers.py", true},
+		{"user_spec.rb", true},
+		{"foo.test.js", true},
+		{"foo.spec.ts", true},
+		// Production files
+		{"loom/models.py", false},
+		{"loom/routers/scenes.py", false},
+		{"internal/graph/graph.go", false},
+		{"conftest.py", false},      // top-level conftest, not in tests/
+		{"testing_utils.go", false}, // contains "testing" but not a test pattern
+		{"loom/database.py", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.path, func(t *testing.T) {
+			t.Parallel()
+			got := IsTestFile(tc.path)
+			if got != tc.want {
+				t.Errorf("IsTestFile(%q) = %v, want %v", tc.path, got, tc.want)
+			}
+		})
+	}
+}
+
 func writeFile(t *testing.T, root, rel, content string) {
 	t.Helper()
 	path := filepath.Join(root, rel)

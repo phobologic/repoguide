@@ -146,6 +146,31 @@ func gitLsFiles(root string) map[string]struct{} {
 	return files
 }
 
+// IsTestFile reports whether relPath appears to be a test file, based on
+// path conventions that are consistent across major languages:
+//   - a directory component named test, tests, spec, specs, or __tests__
+//   - a filename whose base starts with test_, ends with _test or _spec,
+//     or contains .test or .spec (handles .test.js, .spec.ts, etc.)
+func IsTestFile(relPath string) bool {
+	parts := strings.Split(filepath.ToSlash(relPath), "/")
+	// Check directory components (everything except the filename).
+	for _, dir := range parts[:len(parts)-1] {
+		switch strings.ToLower(dir) {
+		case "test", "tests", "spec", "specs", "__tests__":
+			return true
+		}
+	}
+	// Check the filename.
+	name := parts[len(parts)-1]
+	ext := filepath.Ext(name)
+	base := strings.ToLower(strings.TrimSuffix(name, ext))
+	return strings.HasPrefix(base, "test_") ||
+		strings.HasSuffix(base, "_test") ||
+		strings.HasSuffix(base, "_spec") ||
+		strings.Contains(base, ".test") ||
+		strings.Contains(base, ".spec")
+}
+
 func loadGitignore(root string) *ignore.GitIgnore {
 	path := filepath.Join(root, ".gitignore")
 	gi, err := ignore.CompileIgnoreFile(path)

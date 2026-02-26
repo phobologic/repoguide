@@ -108,6 +108,7 @@ repoguide -n 20                              # limit to top 20 files (large repo
 repoguide --cache .repoguide-cache           # cache output (fast on repeat runs)
 repoguide --cache .repoguide-cache /repo     # cache + explicit path
 
+repoguide --with-tests                       # include test files (excluded by default)
 repoguide --symbol BuildGraph                # focused: symbol + its callers/callees
 repoguide --file internal/auth               # focused: symbols and deps for a path
 repoguide --symbol Handle --file server      # focused: combine filters (AND)

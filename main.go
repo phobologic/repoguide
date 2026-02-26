@@ -52,6 +52,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 		maxFileSize  int
 		showVersion  bool
 		raw          bool
+		withTests    bool
 		symbolFilter string
 		fileFilter   string
 	)
@@ -65,6 +66,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	fs.BoolVar(&showVersion, "V", false, "show version and exit")
 	fs.BoolVar(&showVersion, "version", false, "show version and exit")
 	fs.BoolVar(&raw, "raw", false, "output raw TOON without agent context header")
+	fs.BoolVar(&withTests, "with-tests", false, "include test files in output (excluded by default)")
 	fs.StringVar(&symbolFilter, "symbol", "", "filter output to symbols matching this `substring` (case-insensitive)")
 	fs.StringVar(&fileFilter, "file", "", "filter output to files matching this `substring` (case-insensitive)")
 
@@ -90,6 +92,7 @@ Examples:
   repoguide --cache .repoguide-cache         cache output for faster re-runs
   repoguide init                             add repoguide section to ./CLAUDE.md
 
+  repoguide --with-tests                     include test files (excluded by default)
   repoguide --symbol BuildGraph              show BuildGraph and its callers/callees
   repoguide --symbol encode                  case-insensitive: matches Encode, encodeValue
   repoguide --file internal/toon             symbols and deps for the toon package
@@ -147,8 +150,25 @@ Flags:
 		return fmt.Errorf("no parseable files found")
 	}
 
-	// Check cache freshness (skip when filter flags are active)
-	filterActive := symbolFilter != "" || fileFilter != ""
+	// Exclude test files unless --with-tests is set.
+	if !withTests {
+		n := 0
+		for _, f := range files {
+			if !discover.IsTestFile(f.Path) {
+				files[n] = f
+				n++
+			}
+		}
+		files = files[:n]
+	}
+	if len(files) == 0 {
+		return fmt.Errorf("no parseable files found (all files are test files; use --with-tests to include them)")
+	}
+
+	// Check cache freshness (skip when filter flags are active).
+	// --with-tests bypasses the cache so it never overwrites the default
+	// (test-excluded) cache with test-included output.
+	filterActive := symbolFilter != "" || fileFilter != "" || withTests
 	if !filterActive && cachePath != "" && cacheIsFresh(cachePath, root, files) {
 		data, err := os.ReadFile(cachePath)
 		if err == nil {
