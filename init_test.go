@@ -222,6 +222,69 @@ func TestInitSectionContainsExamples(t *testing.T) {
 	}
 }
 
+// TestInitCreatesFileOutput verifies that stderr says "created" on first run.
+func TestInitCreatesFileOutput(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "CLAUDE.md")
+
+	var stdout, stderr bytes.Buffer
+	if err := runInit([]string{path}, &stdout, &stderr); err != nil {
+		t.Fatalf("runInit: %v", err)
+	}
+	if !strings.Contains(stderr.String(), "created") {
+		t.Errorf("expected 'created' in stderr, got: %q", stderr.String())
+	}
+}
+
+// TestInitUpdatedOutput verifies that stderr says "updated" when the existing
+// sentinel block differs from the newly generated section.
+func TestInitUpdatedOutput(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "CLAUDE.md")
+
+	// Write a stale sentinel block.
+	stale := sentinelStart + "\nold content\n" + sentinelEnd + "\n"
+	if err := os.WriteFile(path, []byte(stale), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	if err := runInit([]string{path}, &stdout, &stderr); err != nil {
+		t.Fatalf("runInit: %v", err)
+	}
+	if !strings.Contains(stderr.String(), "updated") {
+		t.Errorf("expected 'updated' in stderr, got: %q", stderr.String())
+	}
+}
+
+// TestInitNoChangeOutput verifies that a second run reports the file is already
+// up to date and does not modify it.
+func TestInitNoChangeOutput(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "CLAUDE.md")
+
+	var buf bytes.Buffer
+	if err := runInit([]string{path}, &buf, &buf); err != nil {
+		t.Fatalf("first run: %v", err)
+	}
+	before, _ := os.ReadFile(path)
+
+	var stdout, stderr bytes.Buffer
+	if err := runInit([]string{path}, &stdout, &stderr); err != nil {
+		t.Fatalf("second run: %v", err)
+	}
+	if !strings.Contains(stderr.String(), "already up to date") {
+		t.Errorf("expected 'already up to date' in stderr, got: %q", stderr.String())
+	}
+	after, _ := os.ReadFile(path)
+	if string(before) != string(after) {
+		t.Error("file should not be modified when already up to date")
+	}
+}
+
 // TestInitDefaultPath verifies that the path argument defaults to CLAUDE.md in
 // the current directory when omitted.
 func TestInitDefaultPath(t *testing.T) {

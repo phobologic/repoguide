@@ -113,6 +113,9 @@ repoguide init --dry-run           # print the generated section, no file writte
 repoguide init --dry-run CLAUDE.md # print what the full file would look like
 ```
 
+The command reports what it did: `created`, `updated`, or `already up to date`.
+Safe to run repeatedly — skips the write when nothing has changed.
+
 The block is wrapped in HTML sentinel comments so subsequent runs replace only
 that section, leaving surrounding content untouched:
 

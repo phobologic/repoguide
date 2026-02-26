@@ -53,7 +53,7 @@ Flags:
 		path = fs.Arg(0)
 	}
 
-	existing, _ := os.ReadFile(path)
+	existing, readErr := os.ReadFile(path)
 	updated := applySection(string(existing), section)
 
 	if dryRun {
@@ -61,11 +61,20 @@ Flags:
 		return nil
 	}
 
+	if updated == string(existing) {
+		_, _ = fmt.Fprintf(stderr, "%s is already up to date\n", path)
+		return nil
+	}
+
 	if err := os.WriteFile(path, []byte(updated), 0o644); err != nil {
 		return fmt.Errorf("writing %s: %w", path, err)
 	}
 
-	_, _ = fmt.Fprintf(stderr, "wrote repoguide section to %s\n", path)
+	if readErr != nil {
+		_, _ = fmt.Fprintf(stderr, "created %s\n", path)
+	} else {
+		_, _ = fmt.Fprintf(stderr, "updated %s\n", path)
+	}
 	return nil
 }
 
