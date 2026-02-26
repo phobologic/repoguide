@@ -239,25 +239,32 @@ func TestBuildCallSites(t *testing.T) {
 				// foo calls bar twice at different lines — both sites should appear
 				{Name: "bar", Kind: model.Reference, SymbolKind: model.Function, Enclosing: "foo", Line: 10},
 				{Name: "bar", Kind: model.Reference, SymbolKind: model.Function, Enclosing: "foo", Line: 20},
-				// top-level call (no enclosing) — excluded
+				// module-level import (no enclosing) — appears as <import> caller
 				{Name: "bar", Kind: model.Reference, SymbolKind: model.Function, Enclosing: "", Line: 5},
-				// external call — excluded
+				// external call — excluded (not a known definition)
 				{Name: "print", Kind: model.Reference, SymbolKind: model.Function, Enclosing: "foo", Line: 15},
 			},
 		},
 	}
 
 	sites := BuildCallSites(fileInfos)
-	if len(sites) != 2 {
-		t.Fatalf("expected 2 call sites (no deduplication), got %d: %+v", len(sites), sites)
+	if len(sites) != 3 {
+		t.Fatalf("expected 3 call sites (2 function calls + 1 import), got %d: %+v", len(sites), sites)
 	}
 	for _, s := range sites {
-		if s.Caller != "foo" || s.Callee != "bar" || s.File != "a.py" {
+		if s.Callee != "bar" || s.File != "a.py" {
 			t.Errorf("unexpected call site: %+v", s)
 		}
 	}
-	if sites[0].Line != 10 || sites[1].Line != 20 {
-		t.Errorf("expected lines 10 and 20, got %d and %d", sites[0].Line, sites[1].Line)
+	// Sorted by caller then line: <import> sorts before "foo".
+	if sites[0].Caller != "<import>" || sites[0].Line != 5 {
+		t.Errorf("expected sites[0] = <import> at line 5, got %+v", sites[0])
+	}
+	if sites[1].Caller != "foo" || sites[1].Line != 10 {
+		t.Errorf("expected sites[1] = foo at line 10, got %+v", sites[1])
+	}
+	if sites[2].Caller != "foo" || sites[2].Line != 20 {
+		t.Errorf("expected sites[2] = foo at line 20, got %+v", sites[2])
 	}
 }
 

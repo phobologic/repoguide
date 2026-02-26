@@ -74,13 +74,26 @@ comma-separated values.
 
 ---`
 
+const headerFocused = `# Focused query — callers, callsites, and dependencies
+
+- **callsites**: every call or import occurrence — ` + "`caller`" + ` = calling function, or ` + "`<import>`" + ` for file-level imports
+- **dependencies**: cross-file imports — ` + "`source`" + ` imports ` + "`target`" + `
+
+---`
+
 // writeOutput writes the TOON data to w, prepending the agent context header
-// unless raw is true. withTests controls which header variant is used.
-func writeOutput(w io.Writer, toonData string, raw, withTests bool) {
+// unless raw is true. focused selects the compact header for --symbol / --file
+// queries; withTests selects the test-inclusive header variant.
+func writeOutput(w io.Writer, toonData string, raw, withTests, focused bool) {
 	if !raw {
-		h := headerBase
-		if withTests {
+		var h string
+		switch {
+		case focused:
+			h = headerFocused
+		case withTests:
 			h = headerWithTests
+		default:
+			h = headerBase
 		}
 		_, _ = fmt.Fprintln(w, h)
 	}

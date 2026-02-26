@@ -125,7 +125,7 @@ but the full output is still written to cache, so subsequent full runs stay fast
 Read the ` + "`files`" + ` table top-to-bottom: PageRank order shows which files are most
 central. Start reading there, not from directory listings or arbitrary guesses.
 
-**Phase 2 — run ` + "`--symbol`" + ` or ` + "`--file`" + ` for specific mid-task lookups** (rules 2–5
+**Phase 2 — run ` + "`--symbol`" + ` or ` + "`--file`" + ` for specific mid-task lookups** (rules 2–7
 below). These bypass the cache read but write back to it, so full runs stay fast.
 
 **Rules:**
@@ -133,31 +133,44 @@ below). These bypass the cache read but write back to it, so full runs stay fast
 1. **Read files in ranked order.** The ` + "`files`" + ` table is sorted by PageRank
    (most central first). Do not start from directory listings.
 
-2. **When you need to find all callers of a function, use ` + "`--symbol`" + ` instead of
-   Grep.** ` + "`repoguide --symbol <name>`" + ` returns the definition location, every call
-   site with exact file and line number, and the function's callees — in one
-   command. This is the highest-value feature and the clearest case where
-   repoguide beats grep: grep returns raw text; ` + "`--symbol`" + ` returns structured
-   navigation data including line numbers ready for ` + "`Read(offset=N)`" + `.
+2. **Before running Grep to find where an exported name is used, run
+   ` + "`repoguide --symbol <name>`" + ` first.** If the name is indexed, ` + "`--symbol`" + `
+   returns structured file+line data you can feed directly to
+   ` + "`Read(offset=N, limit=10)`" + `. Fall back to Grep only if ` + "`--symbol`" + ` returns no
+   results or the name is unexported/not a definition.
 
-3. **Use the ` + "`callsites`" + ` table for precise file navigation.** Focused queries
+3. **` + "`--symbol`" + ` returns call sites AND import sites for a name.** The ` + "`callsites`" + `
+   table includes every function-call occurrence (` + "`caller`" + ` = calling function) and
+   every file-level import (` + "`caller`" + ` = ` + "`<import>`" + `), each with exact file+line.
+   The ` + "`dependencies`" + ` table shows which files import the file that defines the
+   symbol. Together these answer both "who calls this?" and "who imports this?".
+   Use the line numbers directly with ` + "`Read(offset=N, limit=10)`" + ` rather than
+   scanning raw Grep output.
+
+4. **To find all files that depend on a module or path, use ` + "`--file <path>`" + `.** The
+   ` + "`dependencies`" + ` table in the output lists every importer: ` + "`source`" + ` imports
+   ` + "`target`" + `. Example: ` + "`repoguide --file loom/ai/stubs`" + ` shows every file that
+   imports from that module. Use this for "I'm replacing X — who depends on it?"
+   instead of Grep.
+
+5. **Use the ` + "`callsites`" + ` table for precise file navigation.** Focused queries
    (` + "`--symbol`" + ` or ` + "`--file`" + `) include a ` + "`callsites[N]{caller,callee,file,line}`" + ` table
    with the exact line of every call occurrence. Use those line numbers for
    ` + "`Read(offset=N, limit=10)`" + ` instead of scanning from a rough offset.
 
-4. **Use the ` + "`symbols`" + ` table as a lookup index, not a scanning surface.** It
+6. **Use the ` + "`symbols`" + ` table as a lookup index, not a scanning surface.** It
    lists every exported definition with file and line. Look up a name you already
    know — don't scroll through it searching for something.
 
-5. **Use ` + "`--file`" + ` when focused on a subsystem.** ` + "`repoguide --file internal/auth`" + `
+7. **Use ` + "`--file`" + ` when focused on a subsystem.** ` + "`repoguide --file internal/auth`" + `
    gives all symbols and dependencies for that path without full-map noise.
    Combine with ` + "`--symbol`" + ` (AND semantics) when a name appears across packages.
 
-6. **Only fall back to Glob/Grep for things repoguide cannot answer** — e.g.,
-   string literal searches, pattern matching on unexported names, or searching
-   within a file you've already identified.
+8. **Fall back to Grep for: string literal searches, unexported names (repoguide
+   only indexes exported definitions), or searching within a file you've already
+   identified.**
 
-7. **Re-run after large structural changes.** The map is a snapshot. If you've
+9. **Re-run after large structural changes.** The map is a snapshot. If you've
    added new files or significantly restructured imports, re-run to refresh it.`
 
 	return sentinelStart + "\n" + body + "\n" + sentinelEnd

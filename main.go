@@ -168,11 +168,12 @@ Flags:
 	// Check cache freshness (skip when filter flags are active).
 	// --with-tests bypasses the cache so it never overwrites the default
 	// (test-excluded) cache with test-included output.
-	filterActive := symbolFilter != "" || fileFilter != "" || withTests
+	focused := symbolFilter != "" || fileFilter != ""
+	filterActive := focused || withTests
 	if !filterActive && cachePath != "" && cacheIsFresh(cachePath, root, files) {
 		data, err := os.ReadFile(cachePath)
 		if err == nil {
-			writeOutput(stdout, strings.TrimRight(string(data), "\n"), raw, withTests)
+			writeOutput(stdout, strings.TrimRight(string(data), "\n"), raw, withTests, focused)
 			return nil
 		}
 	}
@@ -228,7 +229,7 @@ Flags:
 		_ = os.WriteFile(cachePath, []byte(output+"\n"), 0o644)
 	}
 
-	writeOutput(stdout, output, raw, withTests)
+	writeOutput(stdout, output, raw, withTests, focused)
 	return nil
 }
 

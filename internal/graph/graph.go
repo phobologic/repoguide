@@ -123,10 +123,12 @@ func BuildCallGraph(fileInfos []model.FileInfo) []model.CallEdge {
 	return edges
 }
 
-// BuildCallSites returns all individual call occurrences with source locations.
-// Unlike BuildCallGraph, it does not deduplicate: if a function calls another
-// three times, three CallSite entries are returned. Intended for focused
-// (--symbol / --file) queries where precise line numbers matter.
+// BuildCallSites returns all individual call and import occurrences with source
+// locations. Unlike BuildCallGraph, it does not deduplicate: if a function calls
+// another three times, three CallSite entries are returned. Module-level import
+// references (where no enclosing function exists) are included with Caller set to
+// "<import>". Intended for focused (--symbol / --file) queries where precise line
+// numbers matter.
 func BuildCallSites(fileInfos []model.FileInfo) []model.CallSite {
 	// Build set of all known definition names.
 	knownDefs := make(map[string]struct{})
@@ -143,14 +145,18 @@ func BuildCallSites(fileInfos []model.FileInfo) []model.CallSite {
 	for i := range fileInfos {
 		for j := range fileInfos[i].Tags {
 			tag := &fileInfos[i].Tags[j]
-			if tag.Kind != model.Reference || tag.Enclosing == "" {
+			if tag.Kind != model.Reference {
 				continue
 			}
 			if _, ok := knownDefs[tag.Name]; !ok {
 				continue
 			}
+			caller := tag.Enclosing
+			if caller == "" {
+				caller = "<import>"
+			}
 			sites = append(sites, model.CallSite{
-				Caller: tag.Enclosing,
+				Caller: caller,
 				Callee: tag.Name,
 				File:   fileInfos[i].Path,
 				Line:   tag.Line,
