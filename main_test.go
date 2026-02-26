@@ -458,7 +458,7 @@ func TestRunFullMapNoCallSites(t *testing.T) {
 		t.Fatalf("run: %v\nstderr: %s", err, stderr.String())
 	}
 
-	if strings.Contains(stdout.String(), "callsites") {
+	if strings.Contains(stdout.String(), "callsites[") {
 		t.Errorf("full map output should not include callsites table:\n%s", stdout.String())
 	}
 }

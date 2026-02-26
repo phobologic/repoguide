@@ -16,9 +16,19 @@ key symbols, and dependencies of the codebase in TOON format.
   graph). Higher rank = more central to the codebase. Start here to find
   the most important files.
 - **symbols**: Exported definitions (classes, functions, methods) with file
-  location and signature. Use this to find where things are defined.
+  location and signature. Use as a lookup index when you know the name —
+  not as a scanning surface.
 - **dependencies**: Cross-file references showing which files depend on
   which. The "symbols" column lists the specific symbols referenced.
+
+## Usage tips
+
+- **To find all callers of a function:** run ` + "`repoguide --symbol <name>`" + `
+  instead of grep. Returns the definition location, every call site with
+  exact file and line number, and the function's callees — in one command.
+- **Focused queries include a ` + "`callsites`" + ` table** with exact file+line for
+  every call occurrence. Use those line numbers for ` + "`Read(offset=N)`" + ` instead
+  of scanning.
 
 ## TOON format
 
