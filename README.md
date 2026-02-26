@@ -47,6 +47,7 @@ repoguide [ROOT] [OPTIONS]
 | `--max-file-size` | Skip files larger than this many bytes (default: 1MB) |
 | `--symbol` | Filter output to symbols matching this substring (case-insensitive) |
 | `--file` | Filter output to files matching this substring (case-insensitive) |
+| `--with-tests` | Include test files in output (excluded by default) |
 | `--raw` | Output raw TOON without agent context header |
 | `--version`, `-V` | Show version and exit |
 
@@ -85,7 +86,7 @@ Use `--symbol` and `--file` to get a targeted view instead of the full map.
 These are useful when asking Claude about a specific function or subsystem.
 
 ```
-repoguide --symbol BuildGraph        # show BuildGraph: definition, callers, callees
+repoguide --symbol BuildGraph        # show BuildGraph: definition, callers, callees, import sites
 repoguide --file internal/auth       # show all symbols and deps for auth package
 repoguide --symbol Handle --file srv # combine: Handle symbol scoped to srv files
 ```
@@ -93,6 +94,10 @@ repoguide --symbol Handle --file srv # combine: Handle symbol scoped to srv file
 Both flags do case-insensitive substring matching and can be combined (AND semantics).
 When active, the cache is bypassed for reading but the full unfiltered output is still
 written to cache on the same run.
+
+The `--symbol` output includes a `callsites` table with every call occurrence *and*
+every file-level import site, each with exact file and line number. Use those line
+numbers with `Read(offset=N)` for precise navigation without scanning.
 
 ## Subcommands
 
