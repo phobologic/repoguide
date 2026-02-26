@@ -225,3 +225,46 @@ func TestBuildCallGraphEmpty(t *testing.T) {
 		t.Errorf("expected nil, got %v", edges)
 	}
 }
+
+func TestBuildCallSites(t *testing.T) {
+	t.Parallel()
+
+	fileInfos := []model.FileInfo{
+		{
+			Path:     "a.py",
+			Language: "python",
+			Tags: []model.Tag{
+				{Name: "bar", Kind: model.Definition, SymbolKind: model.Function},
+				{Name: "foo", Kind: model.Definition, SymbolKind: model.Function},
+				// foo calls bar twice at different lines — both sites should appear
+				{Name: "bar", Kind: model.Reference, SymbolKind: model.Function, Enclosing: "foo", Line: 10},
+				{Name: "bar", Kind: model.Reference, SymbolKind: model.Function, Enclosing: "foo", Line: 20},
+				// top-level call (no enclosing) — excluded
+				{Name: "bar", Kind: model.Reference, SymbolKind: model.Function, Enclosing: "", Line: 5},
+				// external call — excluded
+				{Name: "print", Kind: model.Reference, SymbolKind: model.Function, Enclosing: "foo", Line: 15},
+			},
+		},
+	}
+
+	sites := BuildCallSites(fileInfos)
+	if len(sites) != 2 {
+		t.Fatalf("expected 2 call sites (no deduplication), got %d: %+v", len(sites), sites)
+	}
+	for _, s := range sites {
+		if s.Caller != "foo" || s.Callee != "bar" || s.File != "a.py" {
+			t.Errorf("unexpected call site: %+v", s)
+		}
+	}
+	if sites[0].Line != 10 || sites[1].Line != 20 {
+		t.Errorf("expected lines 10 and 20, got %d and %d", sites[0].Line, sites[1].Line)
+	}
+}
+
+func TestBuildCallSitesEmpty(t *testing.T) {
+	t.Parallel()
+	sites := BuildCallSites(nil)
+	if sites != nil {
+		t.Errorf("expected nil, got %v", sites)
+	}
+}

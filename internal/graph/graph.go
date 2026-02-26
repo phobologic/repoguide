@@ -123,6 +123,57 @@ func BuildCallGraph(fileInfos []model.FileInfo) []model.CallEdge {
 	return edges
 }
 
+// BuildCallSites returns all individual call occurrences with source locations.
+// Unlike BuildCallGraph, it does not deduplicate: if a function calls another
+// three times, three CallSite entries are returned. Intended for focused
+// (--symbol / --file) queries where precise line numbers matter.
+func BuildCallSites(fileInfos []model.FileInfo) []model.CallSite {
+	// Build set of all known definition names.
+	knownDefs := make(map[string]struct{})
+	for i := range fileInfos {
+		for j := range fileInfos[i].Tags {
+			tag := &fileInfos[i].Tags[j]
+			if tag.Kind == model.Definition {
+				knownDefs[tag.Name] = struct{}{}
+			}
+		}
+	}
+
+	var sites []model.CallSite
+	for i := range fileInfos {
+		for j := range fileInfos[i].Tags {
+			tag := &fileInfos[i].Tags[j]
+			if tag.Kind != model.Reference || tag.Enclosing == "" {
+				continue
+			}
+			if _, ok := knownDefs[tag.Name]; !ok {
+				continue
+			}
+			sites = append(sites, model.CallSite{
+				Caller: tag.Enclosing,
+				Callee: tag.Name,
+				File:   fileInfos[i].Path,
+				Line:   tag.Line,
+			})
+		}
+	}
+
+	sort.Slice(sites, func(i, j int) bool {
+		if sites[i].Caller != sites[j].Caller {
+			return sites[i].Caller < sites[j].Caller
+		}
+		if sites[i].Callee != sites[j].Callee {
+			return sites[i].Callee < sites[j].Callee
+		}
+		if sites[i].File != sites[j].File {
+			return sites[i].File < sites[j].File
+		}
+		return sites[i].Line < sites[j].Line
+	})
+
+	return sites
+}
+
 // Rank applies PageRank to file_infos and sorts them by rank descending.
 func Rank(fileInfos []model.FileInfo, deps []model.Dependency) {
 	if len(fileInfos) == 0 {

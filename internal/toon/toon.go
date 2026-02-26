@@ -73,6 +73,20 @@ func Encode(rm *model.RepoMap) string {
 	}
 	parts = append(parts, formatTabular("calls", []string{"caller", "callee"}, callRows))
 
+	if len(rm.CallSites) > 0 {
+		var siteRows [][]string
+		for i := range rm.CallSites {
+			cs := &rm.CallSites[i]
+			siteRows = append(siteRows, []string{
+				cs.Caller,
+				cs.Callee,
+				cs.File,
+				fmt.Sprintf("%d", cs.Line),
+			})
+		}
+		parts = append(parts, formatTabular("callsites", []string{"caller", "callee", "file", "line"}, siteRows))
+	}
+
 	return strings.Join(parts, "\n")
 }
 

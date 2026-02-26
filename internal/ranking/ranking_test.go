@@ -61,6 +61,11 @@ func makeFilterRepoMap() *model.RepoMap {
 			{Caller: "Foo", Callee: "Baz"},
 			{Caller: "Qux", Callee: "Foo"},
 		},
+		CallSites: []model.CallSite{
+			{Caller: "Foo", Callee: "Baz", File: "a.go", Line: 10},
+			{Caller: "Foo", Callee: "Baz", File: "a.go", Line: 20},
+			{Caller: "Qux", Callee: "Foo", File: "c.go", Line: 5},
+		},
 	}
 }
 
@@ -289,4 +294,51 @@ func fileNames(rm *model.RepoMap) []string {
 		names[i] = f.Path
 	}
 	return names
+}
+
+// TestFilterBySymbolCallSites verifies that FilterBySymbol propagates CallSites
+// matching the target symbol on either end.
+func TestFilterBySymbolCallSites(t *testing.T) {
+	t.Parallel()
+
+	rm := makeFilterRepoMap()
+	got := FilterBySymbol(rm, "Foo")
+
+	// Foo is caller in Foo→Baz (lines 10, 20) and callee in Qux→Foo (line 5)
+	if len(got.CallSites) != 3 {
+		t.Fatalf("expected 3 call sites, got %d: %+v", len(got.CallSites), got.CallSites)
+	}
+}
+
+// TestFilterBySymbolCallSitesNoMatch verifies that CallSites are empty when
+// the matched symbol has no call site entries.
+func TestFilterBySymbolCallSitesNoMatch(t *testing.T) {
+	t.Parallel()
+
+	rm := makeFilterRepoMap()
+	// Bar has no call edges or sites in the fixture.
+	got := FilterBySymbol(rm, "Bar")
+
+	if len(got.CallSites) != 0 {
+		t.Fatalf("expected 0 call sites, got %d: %+v", len(got.CallSites), got.CallSites)
+	}
+}
+
+// TestFilterByFileCallSites verifies that FilterByFile propagates CallSites
+// whose File field matches the filtered path.
+func TestFilterByFileCallSites(t *testing.T) {
+	t.Parallel()
+
+	rm := makeFilterRepoMap()
+	got := FilterByFile(rm, "a.go")
+
+	// Sites with File=="a.go": Foo→Baz at lines 10 and 20
+	if len(got.CallSites) != 2 {
+		t.Fatalf("expected 2 call sites for a.go, got %d: %+v", len(got.CallSites), got.CallSites)
+	}
+	for _, cs := range got.CallSites {
+		if cs.File != "a.go" {
+			t.Errorf("unexpected file in call site: %+v", cs)
+		}
+	}
 }

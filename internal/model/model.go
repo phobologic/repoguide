@@ -54,6 +54,14 @@ type CallEdge struct {
 	Callee string
 }
 
+// CallSite records a specific call occurrence with its source location.
+type CallSite struct {
+	Caller string
+	Callee string
+	File   string
+	Line   int
+}
+
 // RepoMap is the complete analyzed repository map, ready for serialization.
 type RepoMap struct {
 	RepoName     string
@@ -61,4 +69,5 @@ type RepoMap struct {
 	Files        []FileInfo
 	Dependencies []Dependency
 	CallEdges    []CallEdge
+	CallSites    []CallSite
 }

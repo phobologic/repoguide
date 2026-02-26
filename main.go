@@ -187,7 +187,10 @@ Flags:
 		rm = ranking.SelectFiles(rm, maxFiles)
 	}
 
-	// Apply focused query filters
+	// Apply focused query filters; populate per-site call locations for targeted reads.
+	if filterActive {
+		rm.CallSites = graph.BuildCallSites(fileInfos)
+	}
 	if symbolFilter != "" {
 		rm = ranking.FilterBySymbol(rm, symbolFilter)
 	}
@@ -198,8 +201,9 @@ Flags:
 	// Encode to TOON
 	output := toon.Encode(rm)
 
-	// Write cache
-	if cachePath != "" {
+	// Write cache (skip when filter flags are active — filtered output must not
+	// overwrite the full-map cache).
+	if cachePath != "" && !filterActive {
 		_ = os.MkdirAll(filepath.Dir(cachePath), 0o755)
 		_ = os.WriteFile(cachePath, []byte(output+"\n"), 0o644)
 	}

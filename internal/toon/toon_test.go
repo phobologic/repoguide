@@ -184,4 +184,35 @@ func TestEncodeCallEdges(t *testing.T) {
 	if !strings.Contains(got, "  MyClass.method,helper") {
 		t.Errorf("missing MyClass.method,helper edge:\n%s", got)
 	}
+	// No callsites populated — table must not appear.
+	if strings.Contains(got, "callsites") {
+		t.Errorf("callsites table should not appear when CallSites is empty:\n%s", got)
+	}
+}
+
+func TestEncodeCallSites(t *testing.T) {
+	t.Parallel()
+
+	rm := &model.RepoMap{
+		RepoName: "r",
+		Root:     "r",
+		CallEdges: []model.CallEdge{
+			{Caller: "foo", Callee: "bar"},
+		},
+		CallSites: []model.CallSite{
+			{Caller: "foo", Callee: "bar", File: "pkg/a.go", Line: 42},
+			{Caller: "foo", Callee: "bar", File: "pkg/a.go", Line: 57},
+		},
+	}
+
+	got := Encode(rm)
+	if !strings.Contains(got, "callsites[2]{caller,callee,file,line}:") {
+		t.Errorf("missing callsites header:\n%s", got)
+	}
+	if !strings.Contains(got, "foo,bar,pkg/a.go,42") {
+		t.Errorf("missing first call site:\n%s", got)
+	}
+	if !strings.Contains(got, "foo,bar,pkg/a.go,57") {
+		t.Errorf("missing second call site:\n%s", got)
+	}
 }

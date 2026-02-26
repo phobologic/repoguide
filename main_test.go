@@ -428,6 +428,41 @@ func TestRunSymbolFilterCacheSkipped(t *testing.T) {
 	}
 }
 
+func TestRunSymbolFilterCallSites(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeTestFile(t, dir, "utils.py", "def helper():\n    pass\n")
+	writeTestFile(t, dir, "main.py", "def greet():\n    helper()\n    helper()\n")
+
+	var stdout, stderr bytes.Buffer
+	err := run([]string{"--symbol", "helper", dir}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run: %v\nstderr: %s", err, stderr.String())
+	}
+
+	out := stdout.String()
+	if !strings.Contains(out, "callsites") {
+		t.Errorf("--symbol output should include callsites table:\n%s", out)
+	}
+}
+
+func TestRunFullMapNoCallSites(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeTestFile(t, dir, "utils.py", "def helper():\n    pass\n")
+	writeTestFile(t, dir, "main.py", "def greet():\n    helper()\n")
+
+	var stdout, stderr bytes.Buffer
+	err := run([]string{dir}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run: %v\nstderr: %s", err, stderr.String())
+	}
+
+	if strings.Contains(stdout.String(), "callsites") {
+		t.Errorf("full map output should not include callsites table:\n%s", stdout.String())
+	}
+}
+
 func TestReorderArgs(t *testing.T) {
 	t.Parallel()
 

@@ -49,12 +49,21 @@ func SelectFiles(rm *model.RepoMap, maxFiles int) *model.RepoMap {
 		}
 	}
 
+	var callSites []model.CallSite
+	for i := range rm.CallSites {
+		cs := &rm.CallSites[i]
+		if _, ok := selectedDefs[cs.Caller]; ok {
+			callSites = append(callSites, *cs)
+		}
+	}
+
 	return &model.RepoMap{
 		RepoName:     rm.RepoName,
 		Root:         rm.Root,
 		Files:        selected,
 		Dependencies: deps,
 		CallEdges:    callEdges,
+		CallSites:    callSites,
 	}
 }
 
@@ -127,12 +136,23 @@ func FilterBySymbol(rm *model.RepoMap, substr string) *model.RepoMap {
 		}
 	}
 
+	var callSites []model.CallSite
+	for i := range rm.CallSites {
+		cs := &rm.CallSites[i]
+		_, callerOK := matchedSymbols[cs.Caller]
+		_, calleeOK := matchedSymbols[cs.Callee]
+		if callerOK || calleeOK {
+			callSites = append(callSites, *cs)
+		}
+	}
+
 	return &model.RepoMap{
 		RepoName:     rm.RepoName,
 		Root:         rm.Root,
 		Files:        files,
 		Dependencies: deps,
 		CallEdges:    callEdges,
+		CallSites:    callSites,
 	}
 }
 
@@ -180,11 +200,20 @@ func FilterByFile(rm *model.RepoMap, substr string) *model.RepoMap {
 		}
 	}
 
+	var callSites []model.CallSite
+	for i := range rm.CallSites {
+		cs := &rm.CallSites[i]
+		if _, ok := matchedFiles[cs.File]; ok {
+			callSites = append(callSites, *cs)
+		}
+	}
+
 	return &model.RepoMap{
 		RepoName:     rm.RepoName,
 		Root:         rm.Root,
 		Files:        files,
 		Dependencies: deps,
 		CallEdges:    callEdges,
+		CallSites:    callSites,
 	}
 }
