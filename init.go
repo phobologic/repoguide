@@ -139,10 +139,16 @@ but the full output is still written to cache, so subsequent full runs stay fast
    run ` + "`repoguide --symbol <name>`" + ` to get its definition, callers, callees, and
    relevant files in one shot. Faster than searching and more complete.
 
-6. **Use ` + "`--file`" + ` when focused on a subsystem.** ` + "`repoguide --file internal/auth`" + `
+6. **Use the ` + "`callsites`" + ` table for targeted edits.** Focused queries
+   (` + "`--symbol`" + ` or ` + "`--file`" + `) include a ` + "`callsites[N]{caller,callee,file,line}`" + ` table
+   with the exact file and line of every call occurrence. Use these line numbers
+   for precise ` + "`Read(offset=N, limit=10)`" + ` calls instead of scanning from a rough
+   offset. The full map omits this table to keep ambient context lean.
+
+7. **Use ` + "`--file`" + ` when focused on a subsystem.** ` + "`repoguide --file internal/auth`" + `
    gives all symbols and dependencies for that path without full-map noise.
 
-7. **Combine filters for precision.** ` + "`--symbol`" + ` and ` + "`--file`" + ` can be used together
+8. **Combine filters for precision.** ` + "`--symbol`" + ` and ` + "`--file`" + ` can be used together
    (AND semantics) when a symbol name is common across packages.`
 
 	return sentinelStart + "\n" + body + "\n" + sentinelEnd
