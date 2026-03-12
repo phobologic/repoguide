@@ -49,6 +49,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 		maxFiles     int
 		langs        string
 		cachePath    string
+		outputFormat string
 		maxFileSize  int
 		showVersion  bool
 		raw          bool
@@ -63,6 +64,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	fs.StringVar(&langs, "l", "", "comma-separated languages to include")
 	fs.StringVar(&langs, "langs", "", "comma-separated languages to include")
 	fs.StringVar(&cachePath, "cache", "", "cache output to `file` (add to .gitignore if used)")
+	fs.StringVar(&outputFormat, "format", string(toon.FormatV2), "output format: v1 or v2")
 	fs.IntVar(&maxFileSize, "max-file-size", defaultMaxFileSize, "skip files larger than `bytes`")
 	fs.BoolVar(&showVersion, "V", false, "show version and exit")
 	fs.BoolVar(&showVersion, "version", false, "show version and exit")
@@ -92,6 +94,7 @@ Examples:
   repoguide -l go,typescript                 filter by language
   repoguide -n 20                            top 20 files (large repos)
   repoguide --cache .repoguide-cache         cache output for faster re-runs
+  repoguide --format v1                      use legacy output format
   repoguide init                             add repoguide section to ./CLAUDE.md
 
   repoguide --with-tests                     include test files (excluded by default)
@@ -112,6 +115,11 @@ Flags:
 	if showVersion {
 		_, _ = fmt.Fprintf(stdout, "repoguide %s\n", version)
 		return nil
+	}
+
+	format, formatErr := toon.ParseFormat(outputFormat)
+	if formatErr != nil {
+		return formatErr
 	}
 
 	root := "."
@@ -174,7 +182,7 @@ Flags:
 	filterActive := focused || withTests
 	if !filterActive && cachePath != "" && cacheIsFresh(cachePath, root, files) {
 		data, err := os.ReadFile(cachePath)
-		if err == nil {
+		if err == nil && toon.CacheMatchesFormat(string(data), format) {
 			writeOutput(stdout, strings.TrimRight(string(data), "\n"), raw, withTests, focused)
 			return nil
 		}
@@ -222,7 +230,7 @@ Flags:
 	}
 
 	// Encode to TOON
-	output := toon.Encode(rm, focused)
+	output := toon.Encode(rm, focused, format)
 
 	// Write cache (skip when filter flags are active — filtered output must not
 	// overwrite the full-map cache).
@@ -377,6 +385,7 @@ var flagsWithValue = map[string]bool{
 	"-l": true, "--l": true,
 	"-langs": true, "--langs": true,
 	"-cache": true, "--cache": true,
+	"-format": true, "--format": true,
 	"-max-file-size": true, "--max-file-size": true,
 	"-symbol": true, "--symbol": true,
 	"-file": true, "--file": true,

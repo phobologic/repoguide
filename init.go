@@ -107,6 +107,7 @@ repoguide -l go,typescript                   # filter by language
 repoguide -n 20                              # limit to top 20 files (large repos)
 repoguide --cache .repoguide-cache           # cache output (fast on repeat runs)
 repoguide --cache .repoguide-cache /repo     # cache + explicit path
+repoguide --format v1                        # use the legacy output schema
 
 repoguide --with-tests                       # include test files (excluded by default)
 repoguide --symbol BuildGraph                # focused: symbol + its callers/callees
@@ -114,6 +115,8 @@ repoguide --symbol RepoMap --members         # focused: symbol + its fields/meth
 repoguide --file internal/auth               # focused: symbols and deps for a path
 repoguide --symbol Handle --file server      # focused: combine filters (AND)
 ` + "```" + `
+
+**Format:** ` + "`v2`" + ` is the compact default. Use ` + "`--format v1`" + ` for the legacy schema.
 
 **Caching:** Filter flags (` + "`--symbol`" + `, ` + "`--file`" + `) bypass the cache read
 but the full output is still written to cache, so subsequent full runs stay fast.
@@ -170,7 +173,7 @@ below). These bypass the cache read but write back to it, so full runs stay fast
    instead of Grep.
 
 7. **Use the ` + "`callsites`" + ` table for precise file navigation.** Focused queries
-   (` + "`--symbol`" + ` or ` + "`--file`" + `) include a ` + "`callsites[N]{caller,callee,file,line}`" + ` table
+   (` + "`--symbol`" + ` or ` + "`--file`" + `) include compact entries like ` + "`caller->callee@fN:line`" + `
    with the exact line of every call occurrence. Use those line numbers for
    ` + "`Read(offset=N, limit=10)`" + ` instead of scanning from a rough offset.
 

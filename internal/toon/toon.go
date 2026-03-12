@@ -19,106 +19,51 @@ var (
 	}
 )
 
+type Format string
+
+const (
+	FormatV1 Format = "v1"
+	FormatV2 Format = "v2"
+)
+
+func ParseFormat(value string) (Format, error) {
+	switch Format(value) {
+	case FormatV1, FormatV2:
+		return Format(value), nil
+	default:
+		return "", fmt.Errorf("unsupported format %q", value)
+	}
+}
+
+func CacheMatchesFormat(data string, format Format) bool {
+	trimmed := strings.TrimSpace(data)
+	if trimmed == "" {
+		return false
+	}
+
+	switch format {
+	case FormatV1:
+		return strings.HasPrefix(trimmed, "repo:")
+	case FormatV2:
+		return strings.HasPrefix(trimmed, "fmt: repoguide/v2")
+	default:
+		return false
+	}
+}
+
 // Encode converts a RepoMap into TOON format.
 // When focused is true (--symbol or --file query), callsites are emitted
 // immediately after files so truncation cuts noise rather than the primary
 // deliverable.
-func Encode(rm *model.RepoMap, focused bool) string {
-	var parts []string
-
-	parts = append(parts, fmt.Sprintf("repo: %s", encodeValue(rm.RepoName)))
-	parts = append(parts, fmt.Sprintf("root: %s", encodeValue(rm.Root)))
-
-	var fileRows [][]string
-	for i := range rm.Files {
-		fi := &rm.Files[i]
-		fileRows = append(fileRows, []string{
-			fi.Path,
-			fi.Language,
-			fmt.Sprintf("%.4f", fi.Rank),
-		})
+func Encode(rm *model.RepoMap, focused bool, format Format) string {
+	switch format {
+	case FormatV1:
+		return encodeV1(rm, focused)
+	case FormatV2:
+		return encodeV2(rm, focused)
+	default:
+		return encodeV2(rm, focused)
 	}
-	parts = append(parts, formatTabular("files", []string{"path", "language", "rank"}, fileRows))
-
-	// In focused mode, callsites and members come before symbols — they are the
-	// primary deliverables and must survive truncation.
-	if focused && len(rm.CallSites) > 0 {
-		parts = append(parts, encodeSites(rm.CallSites))
-	}
-	if focused && len(rm.Members) > 0 {
-		parts = append(parts, encodeMembers(rm.Members))
-	}
-
-	var symbolRows [][]string
-	for i := range rm.Files {
-		fi := &rm.Files[i]
-		for j := range fi.Tags {
-			tag := &fi.Tags[j]
-			if tag.Kind == model.Definition {
-				symbolRows = append(symbolRows, []string{
-					fi.Path,
-					tag.Name,
-					string(tag.SymbolKind),
-					fmt.Sprintf("%d", tag.Line),
-					tag.Signature,
-				})
-			}
-		}
-	}
-	parts = append(parts, formatTabular("symbols", []string{"file", "name", "kind", "line", "signature"}, symbolRows))
-
-	var depRows [][]string
-	for i := range rm.Dependencies {
-		d := &rm.Dependencies[i]
-		depRows = append(depRows, []string{
-			d.Source,
-			d.Target,
-			strings.Join(d.Symbols, " "),
-		})
-	}
-	parts = append(parts, formatTabular("dependencies", []string{"source", "target", "symbols"}, depRows))
-
-	var callRows [][]string
-	for i := range rm.CallEdges {
-		ce := &rm.CallEdges[i]
-		callRows = append(callRows, []string{ce.Caller, ce.Callee})
-	}
-	parts = append(parts, formatTabular("calls", []string{"caller", "callee"}, callRows))
-
-	// In non-focused mode, callsites and members appear at the end (empty for full maps).
-	if !focused && len(rm.CallSites) > 0 {
-		parts = append(parts, encodeSites(rm.CallSites))
-	}
-	if !focused && len(rm.Members) > 0 {
-		parts = append(parts, encodeMembers(rm.Members))
-	}
-
-	return strings.Join(parts, "\n")
-}
-
-// encodeMembers renders the members table for field/method tags.
-// Names are unqualified (the part after the last ".") since the owning type
-// is shown in the symbols table above.
-func encodeMembers(members []model.Tag) string {
-	rows := make([][]string, len(members))
-	for i := range members {
-		m := &members[i]
-		name := m.Name
-		if dot := strings.LastIndex(m.Name, "."); dot >= 0 {
-			name = m.Name[dot+1:]
-		}
-		rows[i] = []string{name, string(m.SymbolKind), fmt.Sprintf("%d", m.Line), m.Signature}
-	}
-	return formatTabular("members", []string{"name", "kind", "line", "signature"}, rows)
-}
-
-func encodeSites(sites []model.CallSite) string {
-	rows := make([][]string, len(sites))
-	for i := range sites {
-		cs := &sites[i]
-		rows[i] = []string{cs.Caller, cs.Callee, cs.File, fmt.Sprintf("%d", cs.Line)}
-	}
-	return formatTabular("callsites", []string{"caller", "callee", "file", "line"}, rows)
 }
 
 func formatTabular(name string, columns []string, rows [][]string) string {

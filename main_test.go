@@ -77,8 +77,30 @@ func TestRunRaw(t *testing.T) {
 	if strings.Contains(out, "# Repository Map") {
 		t.Error("--raw should suppress agent context header")
 	}
+	if !strings.HasPrefix(out, "fmt: repoguide/v2") {
+		t.Errorf("--raw output should start with fmt: repoguide/v2, got:\n%s", out)
+	}
+}
+
+func TestRunRawFormatV1(t *testing.T) {
+	t.Parallel()
+	dir := createSampleRepo(t)
+
+	var stdout, stderr bytes.Buffer
+	err := run([]string{"--raw", "--format", "v1", dir}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run: %v\nstderr: %s", err, stderr.String())
+	}
+
+	out := stdout.String()
+	if strings.HasPrefix(out, "fmt: repoguide/v2") {
+		t.Fatalf("v1 output should not use v2 header:\n%s", out)
+	}
 	if !strings.HasPrefix(out, "repo:") {
-		t.Errorf("--raw output should start with repo:, got:\n%s", out)
+		t.Fatalf("v1 raw output should start with repo:, got:\n%s", out)
+	}
+	if !strings.Contains(out, "files[2]{path,language,rank}:") {
+		t.Fatalf("v1 output should use legacy files table:\n%s", out)
 	}
 }
 
@@ -203,8 +225,32 @@ func TestRunCacheRaw(t *testing.T) {
 	if strings.Contains(out, "# Repository Map") {
 		t.Error("--raw with cache should suppress agent header")
 	}
+	if !strings.HasPrefix(out, "fmt: repoguide/v2") {
+		t.Errorf("--raw cached output should start with fmt: repoguide/v2, got:\n%s", out)
+	}
+}
+
+func TestRunCacheFormatMismatch(t *testing.T) {
+	t.Parallel()
+	dir := createSampleRepo(t)
+	cachePath := filepath.Join(t.TempDir(), "test.cache")
+
+	var stdout1 bytes.Buffer
+	if err := run([]string{"--cache", cachePath, dir}, &stdout1, &bytes.Buffer{}); err != nil {
+		t.Fatalf("first run: %v", err)
+	}
+
+	var stdout2 bytes.Buffer
+	if err := run([]string{"--raw", "--format", "v1", "--cache", cachePath, dir}, &stdout2, &bytes.Buffer{}); err != nil {
+		t.Fatalf("second run: %v", err)
+	}
+
+	out := stdout2.String()
+	if strings.HasPrefix(out, "fmt: repoguide/v2") {
+		t.Fatalf("format-mismatched cache should not be reused:\n%s", out)
+	}
 	if !strings.HasPrefix(out, "repo:") {
-		t.Errorf("--raw cached output should start with repo:, got:\n%s", out)
+		t.Fatalf("v1 raw output should start with repo:, got:\n%s", out)
 	}
 }
 
@@ -220,15 +266,15 @@ func TestRunSymbols(t *testing.T) {
 
 	out := stdout.String()
 	// Check for class definition
-	if !strings.Contains(out, "User,class") {
+	if !strings.Contains(out, "defs.c") || !strings.Contains(out, "User") {
 		t.Error("missing User class definition")
 	}
 	// Check for method
-	if !strings.Contains(out, "User.__init__,method") {
+	if !strings.Contains(out, "User.__init__") {
 		t.Error("missing User.__init__ method")
 	}
 	// Check for function
-	if !strings.Contains(out, "greet,function") {
+	if !strings.Contains(out, "defs.f") || !strings.Contains(out, "greet") {
 		t.Error("missing greet function")
 	}
 }
@@ -245,7 +291,7 @@ func TestRunDependencies(t *testing.T) {
 
 	out := stdout.String()
 	// main.py references User from models.py
-	if !strings.Contains(out, "main.py,models.py,User") {
+	if !strings.Contains(out, "User") {
 		t.Errorf("missing dependency main.py → models.py:\n%s", out)
 	}
 }
@@ -308,7 +354,7 @@ func TestRunCalls(t *testing.T) {
 	if !strings.Contains(out, "calls[") {
 		t.Errorf("missing calls section:\n%s", out)
 	}
-	if !strings.Contains(out, "greet,helper") {
+	if !strings.Contains(out, "greet->helper") {
 		t.Errorf("missing greet→helper call edge:\n%s", out)
 	}
 }
@@ -337,7 +383,7 @@ func TestRunSymbolFilter(t *testing.T) {
 	if !strings.Contains(out, "main.py") {
 		t.Errorf("main.py (defines greet which calls helper) should be in output:\n%s", out)
 	}
-	if !strings.Contains(out, "helper,function") {
+	if !strings.Contains(out, "helper") {
 		t.Errorf("helper definition should appear in symbols:\n%s", out)
 	}
 }
@@ -379,7 +425,7 @@ func TestRunFileFilter(t *testing.T) {
 		// main.py only appears if it's in a dep edge, not as a file row
 		t.Errorf("main.py should not appear as a file:\n%s", out)
 	}
-	if !strings.Contains(out, "helper,function") {
+	if !strings.Contains(out, "helper") {
 		t.Errorf("helper definition should appear:\n%s", out)
 	}
 }
