@@ -35,6 +35,69 @@ def greet(user: User) -> str:
 	return dir
 }
 
+func createTypeScriptRepo(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	writeTestFile(t, dir, "models.ts", `export class User {
+	name: string
+
+	constructor(name: string) {
+		this.name = name
+	}
+}
+
+export function formatUser(user: User): string {
+	return user.name
+}
+`)
+	writeTestFile(t, dir, "main.ts", `import { User, formatUser } from "./models"
+
+export function greet(user: User): string {
+	return formatUser(user)
+}
+`)
+	return dir
+}
+
+func createJavaScriptRepo(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	writeTestFile(t, dir, "models.js", `export class User {
+	constructor(name) {
+		this.name = name
+	}
+
+	greet(message) {
+		return formatMessage(message)
+	}
+}
+
+export function formatMessage(message) {
+	return message.trim()
+}
+`)
+	writeTestFile(t, dir, "main.js", `import { User, formatMessage as format } from "./models.js"
+
+	export function greet(name) {
+	const user = new User(name)
+	return format(user.greet("hi"))
+}
+`)
+	return dir
+}
+
+func createTypeScriptReExportRepo(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	writeTestFile(t, dir, "models.ts", `export function formatMessage(message: string): string {
+	return message.trim()
+}
+`)
+	writeTestFile(t, dir, "index.ts", `export { formatMessage as format } from "./models"
+`)
+	return dir
+}
+
 func TestRunBasic(t *testing.T) {
 	t.Parallel()
 	dir := createSampleRepo(t)
@@ -60,6 +123,78 @@ func TestRunBasic(t *testing.T) {
 	}
 	if !strings.Contains(out, "main.py") {
 		t.Error("missing main.py")
+	}
+}
+
+func TestRunTypeScript(t *testing.T) {
+	t.Parallel()
+	dir := createTypeScriptRepo(t)
+
+	var stdout, stderr bytes.Buffer
+	err := run([]string{"-l", "typescript", dir}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run: %v\nstderr: %s", err, stderr.String())
+	}
+
+	out := stdout.String()
+	if !strings.Contains(out, "models.ts") {
+		t.Error("missing models.ts")
+	}
+	if !strings.Contains(out, "main.ts") {
+		t.Error("missing main.ts")
+	}
+	if !strings.Contains(out, "User.constructor,method") {
+		t.Error("missing TypeScript method symbol")
+	}
+	if !strings.Contains(out, "formatUser") {
+		t.Error("missing TypeScript function symbol")
+	}
+	if !strings.Contains(out, "main.ts,models.ts,User") {
+		t.Errorf("missing TypeScript dependency:\n%s", out)
+	}
+}
+
+func TestRunJavaScript(t *testing.T) {
+	t.Parallel()
+	dir := createJavaScriptRepo(t)
+
+	var stdout, stderr bytes.Buffer
+	err := run([]string{"-l", "typescript", dir}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run: %v\nstderr: %s", err, stderr.String())
+	}
+
+	out := stdout.String()
+	if !strings.Contains(out, "models.js") {
+		t.Error("missing models.js")
+	}
+	if !strings.Contains(out, "main.js") {
+		t.Error("missing main.js")
+	}
+	if !strings.Contains(out, "User.greet,method") {
+		t.Error("missing JavaScript method symbol")
+	}
+	if !strings.Contains(out, "main.js,models.js,User") {
+		t.Errorf("missing JavaScript class dependency:\n%s", out)
+	}
+	if !strings.Contains(out, "User formatMessage") {
+		t.Errorf("missing JavaScript dependency symbols:\n%s", out)
+	}
+}
+
+func TestRunTypeScriptReExport(t *testing.T) {
+	t.Parallel()
+	dir := createTypeScriptReExportRepo(t)
+
+	var stdout, stderr bytes.Buffer
+	err := run([]string{"-l", "typescript", dir}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run: %v\nstderr: %s", err, stderr.String())
+	}
+
+	out := stdout.String()
+	if !strings.Contains(out, "index.ts,models.ts,formatMessage") {
+		t.Errorf("missing TypeScript re-export dependency:\n%s", out)
 	}
 }
 

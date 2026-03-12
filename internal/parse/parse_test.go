@@ -291,6 +291,175 @@ import (
 	}
 }
 
+// --- TypeScript tests ---
+
+func TestTypeScriptExtractFunction(t *testing.T) {
+	t.Parallel()
+	_, extract := setup(t, "typescript")
+
+	tags := extract("export function greet<T>(name: string): T | undefined { return undefined }")
+	defs := filterDefs(tags)
+	if len(defs) != 1 {
+		t.Fatalf("expected 1 def, got %d: %+v", len(defs), defs)
+	}
+	d := defs[0]
+	if d.Name != "greet" {
+		t.Errorf("name = %q, want greet", d.Name)
+	}
+	if d.SymbolKind != model.Function {
+		t.Errorf("kind = %q, want function", d.SymbolKind)
+	}
+	if d.Signature != "greet<T>(name: string) : T | undefined" {
+		t.Errorf("sig = %q", d.Signature)
+	}
+}
+
+func TestTypeScriptExtractClassMembers(t *testing.T) {
+	t.Parallel()
+	_, extract := setup(t, "typescript")
+
+	source := `export class User {
+	name: string
+
+	greet(message: string): string {
+		return format(message)
+	}
+}
+`
+	tags := extract(source)
+	defs := filterDefs(tags)
+
+	names := make(map[string]model.Tag)
+	for _, def := range defs {
+		names[def.Name] = def
+	}
+
+	classDef, ok := names["User"]
+	if !ok {
+		t.Fatalf("missing User class: %+v", defs)
+	}
+	if classDef.Signature != "class User" {
+		t.Errorf("class sig = %q", classDef.Signature)
+	}
+
+	fieldDef, ok := names["User.name"]
+	if !ok {
+		t.Fatalf("missing User.name field: %+v", defs)
+	}
+	if fieldDef.Signature != "name: string" {
+		t.Errorf("field sig = %q", fieldDef.Signature)
+	}
+
+	methodDef, ok := names["User.greet"]
+	if !ok {
+		t.Fatalf("missing User.greet method: %+v", defs)
+	}
+	if methodDef.Signature != "greet(message: string) : string" {
+		t.Errorf("method sig = %q", methodDef.Signature)
+	}
+}
+
+func TestTypeScriptExtractImportAndCall(t *testing.T) {
+	t.Parallel()
+	_, extract := setup(t, "typescript")
+
+	source := `import { format } from "./format"
+
+	export function greet(name: string): string {
+		return format<string>(name)
+	}
+`
+	tags := extract(source)
+	refs := filterRefs(tags)
+
+	names := make(map[string]bool)
+	for _, ref := range refs {
+		names[ref.Name] = true
+	}
+	if !names["format"] {
+		t.Errorf("missing import/call format, got: %v", names)
+	}
+
+	var callRef *model.Tag
+	for i := range refs {
+		if refs[i].Name == "format" && refs[i].Enclosing == "greet" {
+			callRef = &refs[i]
+			break
+		}
+	}
+	if callRef == nil {
+		t.Fatalf("missing enclosed call ref: %+v", refs)
+	}
+}
+
+func TestTypeScriptExtractInterfaceMembers(t *testing.T) {
+	t.Parallel()
+	_, extract := setup(t, "typescript")
+
+	source := `export interface Formatter {
+	name: string
+	format(message: string): string
+}
+`
+	tags := extract(source)
+	defs := filterDefs(tags)
+
+	names := make(map[string]model.Tag)
+	for _, def := range defs {
+		names[def.Name] = def
+	}
+
+	if _, ok := names["Formatter"]; !ok {
+		t.Fatalf("missing Formatter interface: %+v", defs)
+	}
+	fieldDef, ok := names["Formatter.name"]
+	if !ok {
+		t.Fatalf("missing Formatter.name field: %+v", defs)
+	}
+	if fieldDef.Signature != "name: string" {
+		t.Errorf("field sig = %q", fieldDef.Signature)
+	}
+	methodDef, ok := names["Formatter.format"]
+	if !ok {
+		t.Fatalf("missing Formatter.format method: %+v", defs)
+	}
+	if methodDef.Signature != "format(message: string) : string" {
+		t.Errorf("method sig = %q", methodDef.Signature)
+	}
+}
+
+func TestTypeScriptExtractAliasedImportAndReExport(t *testing.T) {
+	t.Parallel()
+	_, extract := setup(t, "typescript")
+
+	source := `import { formatMessage as format } from "./format"
+	export { formatMessage as formatText } from "./format"
+
+	export function greet(name: string): string {
+		return format(name)
+	}
+`
+	tags := extract(source)
+	refs := filterRefs(tags)
+
+	var importCount int
+	var callRef *model.Tag
+	for i := range refs {
+		if refs[i].Name == "formatMessage" {
+			importCount++
+		}
+		if refs[i].Name == "format" && refs[i].Enclosing == "greet" {
+			callRef = &refs[i]
+		}
+	}
+	if importCount != 2 {
+		t.Fatalf("expected 2 formatMessage import refs, got %d: %+v", importCount, refs)
+	}
+	if callRef == nil {
+		t.Fatalf("missing aliased call ref: %+v", refs)
+	}
+}
+
 // --- Ruby tests ---
 
 func TestRubyExtractClass(t *testing.T) {
