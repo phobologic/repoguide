@@ -44,6 +44,7 @@ repoguide [ROOT] [OPTIONS]
 | `--max-files`, `-n` | Limit output to top N files by PageRank (min: 1) |
 | `--langs`, `-l` | Comma-separated languages to include (e.g., `python,go`) |
 | `--cache` | Cache output to file; reuses if newer than all source files (add to `.gitignore`) |
+| `--format` | Output format: `v2` (default) or legacy `v1` |
 | `--max-file-size` | Skip files larger than this many bytes (default: 1MB) |
 | `--symbol` | Filter output to symbols matching this substring (case-insensitive) |
 | `--file` | Filter output to files matching this substring (case-insensitive) |
@@ -53,7 +54,7 @@ repoguide [ROOT] [OPTIONS]
 
 ### Example
 
-By default, output includes a preamble header that explains the format for AI agent consumption. Use `--raw` to strip the header for bare TOON output.
+By default, output uses the compact `v2` schema and includes a preamble header that explains the format for AI agent consumption. Use `--raw` to strip the header for bare TOON output, or `--format v1` for the legacy schema.
 
 ```
 $ repoguide /path/to/myproject -n 3
@@ -64,20 +65,21 @@ key symbols, and dependencies of the codebase in TOON format.
 ...
 
 ---
+fmt: repoguide/v2
 repo: myproject
 root: myproject
-files[3]{path,language,rank}:
-  myproject/models.py,python,0.2755
-  myproject/languages.py,python,0.1183
-  myproject/discovery.py,python,0.0608
-symbols[17]{file,name,kind,line,signature}:
-  myproject/models.py,TagKind,class,10,TagKind(enum.Enum)
-  myproject/models.py,SymbolKind,class,17,SymbolKind(enum.Enum)
-  myproject/models.py,Tag,class,27,Tag
-  myproject/models.py,FileInfo,class,39,FileInfo
+files[3]{id,rank,path}:
+  f1,0.276,myproject/models.py
+  f2,0.118,myproject/languages.py
+  f3,0.061,myproject/discovery.py
+defs.c[4]{file,line,name}:
+  f1,10,TagKind
+  f1,17,SymbolKind
+  f1,27,Tag
+  f1,39,FileInfo
   ...
-dependencies[1]{source,target,symbols}:
-  myproject/discovery.py,myproject/languages.py,language_for_extension
+deps[1]{edge,symbols}:
+  f3->f2,language_for_extension
 ```
 
 ### Focused queries
@@ -164,6 +166,8 @@ The output uses TOON (Text Object Oriented Notation), a compact format designed 
 - **Scalar fields** — `key: value`
 - **Tabular arrays** — `name[count]{col1,col2,...}:` followed by indented CSV rows
 - **Quoting** — values containing special characters are double-quoted; numbers and plain strings are bare
+
+`v2` is the default format. It omits language columns, assigns short file IDs, collapses dependency symbol lists with `|`, and sorts sections by importance so truncation keeps the most relevant context first. Use `--format v1` for the legacy schema.
 
 ## How it works
 

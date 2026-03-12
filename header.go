@@ -13,13 +13,11 @@ key symbols, and dependencies of the codebase in TOON format.
 ## How to read this map
 
 - **files**: Source files ranked by importance (PageRank over the dependency
-  graph). Higher rank = more central to the codebase. Start here to find
-  the most important files.
-- **symbols**: Exported definitions (classes, functions, methods) with file
-  location and signature. Use as a lookup index when you know the name —
-  not as a scanning surface.
-- **dependencies**: Cross-file references showing which files depend on
-  which. The "symbols" column lists the specific symbols referenced.
+  graph). Each file gets a short ID (` + "`f1`" + `, ` + "`f2`" + `, ...) used by later tables.
+- **defs.***: Exported definitions split by kind (` + "`defs.c`" + `, ` + "`defs.f`" + `, ` + "`defs.m`" + `,
+  ` + "`defs.fld`" + `). Use these as the primary symbol lookup index.
+- **deps**: Cross-file references as compact file-ID edges. The ` + "`symbols`" + ` column
+  lists referenced names joined with ` + "`|`" + `.
 
 ## Usage tips
 
@@ -28,15 +26,14 @@ key symbols, and dependencies of the codebase in TOON format.
 - **To find all callers of a function:** run ` + "`repoguide --symbol <name>`" + `
   instead of grep. Returns the definition location, every call site with
   exact file and line number, and the function's callees — in one command.
-- **Focused queries include a ` + "`callsites`" + ` table** with exact file+line for
-  every call occurrence. Use those line numbers for ` + "`Read(offset=N)`" + ` instead
-  of scanning.
+- **Focused queries include a ` + "`callsites`" + ` table** with compact ` + "`caller->callee@fN:line`" + `
+  entries so exact navigation survives truncation.
 
 ## TOON format
 
 Scalar: ` + "`key: value`" + `
 Table: ` + "`name[count]{col1,col2,...}:`" + ` followed by indented rows of
-comma-separated values.
+comma-separated values. Default output is ` + "`v2`" + `; use ` + "`--format v1`" + ` for the legacy schema.
 
 ---`
 
@@ -49,36 +46,33 @@ Test files are included (` + "`--with-tests`" + `).
 ## How to read this map
 
 - **files**: Source files ranked by importance (PageRank over the dependency
-  graph). Higher rank = more central to the codebase. Start here to find
-  the most important files.
-- **symbols**: Exported definitions (classes, functions, methods) with file
-  location and signature. Use as a lookup index when you know the name —
-  not as a scanning surface.
-- **dependencies**: Cross-file references showing which files depend on
-  which. The "symbols" column lists the specific symbols referenced.
+  graph). Each file gets a short ID (` + "`f1`" + `, ` + "`f2`" + `, ...) used by later tables.
+- **defs.***: Exported definitions split by kind (` + "`defs.c`" + `, ` + "`defs.f`" + `, ` + "`defs.m`" + `,
+  ` + "`defs.fld`" + `). Use these as the primary symbol lookup index.
+- **deps**: Cross-file references as compact file-ID edges. The ` + "`symbols`" + ` column
+  lists referenced names joined with ` + "`|`" + `.
 
 ## Usage tips
 
 - **To find all callers of a function:** run ` + "`repoguide --symbol <name>`" + `
   instead of grep. Returns the definition location, every call site with
   exact file and line number, and the function's callees — in one command.
-- **Focused queries include a ` + "`callsites`" + ` table** with exact file+line for
-  every call occurrence. Use those line numbers for ` + "`Read(offset=N)`" + ` instead
-  of scanning.
+- **Focused queries include a ` + "`callsites`" + ` table** with compact ` + "`caller->callee@fN:line`" + `
+  entries so exact navigation survives truncation.
 
 ## TOON format
 
 Scalar: ` + "`key: value`" + `
 Table: ` + "`name[count]{col1,col2,...}:`" + ` followed by indented rows of
-comma-separated values.
+comma-separated values. Default output is ` + "`v2`" + `; use ` + "`--format v1`" + ` for the legacy schema.
 
 ---`
 
 const headerFocused = `# Focused query — callers, callsites, and dependencies
 
-- **callsites**: every call or import occurrence — ` + "`caller`" + ` = calling function, or ` + "`<import>`" + ` for file-level imports
+- **callsites**: every call or import occurrence as ` + "`caller->callee@fN:line`" + ` (` + "`<import>`" + ` for file-level imports)
 - **members**: fields and methods of matched class/struct definitions (only present with ` + "`--members`" + `)
-- **dependencies**: cross-file imports — ` + "`source`" + ` imports ` + "`target`" + `
+- **deps**: compact cross-file imports — ` + "`f2->f1`" + ` means the source file depends on the target file
 - **Do not pipe this output through ` + "`head`" + ` or ` + "`tail`" + `** — the complete output is the value.
 
 ---`

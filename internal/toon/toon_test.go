@@ -105,7 +105,7 @@ func TestEncode(t *testing.T) {
 		},
 	}
 
-	got := Encode(rm, false)
+	got := Encode(rm, false, FormatV1)
 
 	// Verify structure
 	lines := strings.Split(got, "\n")
@@ -150,14 +150,14 @@ func TestEncodeEmpty(t *testing.T) {
 		Root:     "empty",
 	}
 
-	got := Encode(rm, false)
-	if !strings.Contains(got, "files[0]{path,language,rank}:") {
-		t.Errorf("expected empty files section, got:\n%s", got)
+	got := Encode(rm, false, FormatV2)
+	if !strings.Contains(got, "files[0]{id,rank,path}:") {
+		t.Errorf("expected v2 files section, got:\n%s", got)
 	}
-	if !strings.Contains(got, "symbols[0]{file,name,kind,line,signature}:") {
-		t.Errorf("expected empty symbols section, got:\n%s", got)
+	if !strings.Contains(got, "defs.f[0]{file,line,name}:") {
+		t.Errorf("expected empty defs section, got:\n%s", got)
 	}
-	if !strings.Contains(got, "calls[0]{caller,callee}:") {
+	if !strings.Contains(got, "calls[0]{edge}:") {
 		t.Errorf("expected empty calls section, got:\n%s", got)
 	}
 }
@@ -174,7 +174,7 @@ func TestEncodeCallEdges(t *testing.T) {
 		},
 	}
 
-	got := Encode(rm, false)
+	got := Encode(rm, false, FormatV1)
 	if !strings.Contains(got, "calls[2]{caller,callee}:") {
 		t.Errorf("missing calls header:\n%s", got)
 	}
@@ -205,7 +205,7 @@ func TestEncodeCallSites(t *testing.T) {
 		},
 	}
 
-	got := Encode(rm, false)
+	got := Encode(rm, false, FormatV1)
 	if !strings.Contains(got, "callsites[2]{caller,callee,file,line}:") {
 		t.Errorf("missing callsites header:\n%s", got)
 	}
@@ -237,7 +237,7 @@ func TestEncodeMembers(t *testing.T) {
 	}
 
 	// Focused mode: members appear before symbols.
-	got := Encode(rm, true)
+	got := Encode(rm, true, FormatV1)
 	membersIdx := strings.Index(got, "members[2]")
 	symbolsIdx := strings.Index(got, "symbols[1]")
 	if membersIdx < 0 {
@@ -261,15 +261,116 @@ func TestEncodeMembers(t *testing.T) {
 	}
 
 	// Non-focused mode: members table still appears (at end).
-	got2 := Encode(rm, false)
+	got2 := Encode(rm, false, FormatV1)
 	if !strings.Contains(got2, "members[2]{name,kind,line,signature}:") {
 		t.Errorf("members table missing in non-focused mode:\n%s", got2)
 	}
 
 	// No members: table must not appear.
 	rm2 := &model.RepoMap{RepoName: "r", Root: "r"}
-	got3 := Encode(rm2, true)
+	got3 := Encode(rm2, true, FormatV1)
 	if strings.Contains(got3, "members") {
 		t.Errorf("members table should not appear when Members is empty:\n%s", got3)
+	}
+}
+
+func TestEncodeV2(t *testing.T) {
+	t.Parallel()
+
+	rm := &model.RepoMap{
+		RepoName: "myrepo",
+		Root:     "myrepo",
+		Files: []model.FileInfo{
+			{
+				Path:     "src/main.py",
+				Language: "python",
+				Rank:     0.75,
+				Tags: []model.Tag{
+					{Name: "main", Kind: model.Definition, SymbolKind: model.Function, Line: 1, Signature: "main()"},
+				},
+			},
+			{
+				Path:     "src/util.py",
+				Language: "python",
+				Rank:     0.25,
+				Tags: []model.Tag{
+					{Name: "helper", Kind: model.Definition, SymbolKind: model.Function, Line: 1, Signature: "helper(x)"},
+				},
+			},
+		},
+		Dependencies: []model.Dependency{{Source: "src/main.py", Target: "src/util.py", Symbols: []string{"helper", "main"}}},
+		CallEdges:    []model.CallEdge{{Caller: "main", Callee: "helper"}},
+	}
+
+	got := Encode(rm, false, FormatV2)
+	lines := strings.Split(got, "\n")
+	if lines[0] != "fmt: repoguide/v2" {
+		t.Fatalf("line 0: got %q", lines[0])
+	}
+	if lines[3] != "files[2]{id,rank,path}:" {
+		t.Fatalf("files header: got %q", lines[3])
+	}
+	if lines[4] != "  f1,0.75,src/main.py" {
+		t.Fatalf("first file row: got %q", lines[4])
+	}
+	if !strings.Contains(got, "defs.f[2]{file,line,name}:") {
+		t.Fatalf("missing function defs table:\n%s", got)
+	}
+	if !strings.Contains(got, "  f1,1,main") {
+		t.Fatalf("missing main definition:\n%s", got)
+	}
+	if !strings.Contains(got, "  f2,1,helper") {
+		t.Fatalf("missing helper definition:\n%s", got)
+	}
+	if !strings.Contains(got, "deps[1]{edge,symbols}:") {
+		t.Fatalf("missing deps table:\n%s", got)
+	}
+	if !strings.Contains(got, "  f1->f2,helper|main") {
+		t.Fatalf("missing compact dependency row:\n%s", got)
+	}
+	if !strings.Contains(got, `calls[1]{edge}:`) {
+		t.Fatalf("missing compact calls table:\n%s", got)
+	}
+	if !strings.Contains(got, "  main->helper") {
+		t.Fatalf("missing compact call row:\n%s", got)
+	}
+}
+
+func TestEncodeV2Focused(t *testing.T) {
+	t.Parallel()
+
+	rm := &model.RepoMap{
+		RepoName: "r",
+		Root:     "r",
+		Files: []model.FileInfo{{
+			Path:     "pkg/a.go",
+			Language: "go",
+			Rank:     0.5,
+			Tags:     []model.Tag{{Name: "MyStruct", Kind: model.Definition, SymbolKind: model.Class, Line: 1, Signature: "MyStruct"}},
+		}},
+		CallSites: []model.CallSite{{Caller: "<import>", Callee: "MyStruct", File: "pkg/a.go", Line: 42}},
+		Members:   []model.Tag{{Name: "MyStruct.ID", Kind: model.Definition, SymbolKind: model.Field, Line: 2, Signature: "ID int"}},
+	}
+
+	got := Encode(rm, true, FormatV2)
+	callsitesIdx := strings.Index(got, "callsites[1]{site}:")
+	defsIdx := strings.Index(got, "defs.c[1]{file,line,name}:")
+	if callsitesIdx < 0 || defsIdx < 0 {
+		t.Fatalf("missing focused v2 sections:\n%s", got)
+	}
+	if callsitesIdx > defsIdx {
+		t.Fatalf("callsites should precede defs in focused mode:\n%s", got)
+	}
+	if !strings.Contains(got, `  "<import>->MyStruct@f1:42"`) && !strings.Contains(got, "  <import>->MyStruct@f1:42") {
+		t.Fatalf("missing compact callsite row:\n%s", got)
+	}
+	if !strings.Contains(got, "members[1]{kind,line,name,signature}:") {
+		t.Fatalf("missing compact members table:\n%s", got)
+	}
+	if !strings.Contains(got, "  fld,2,ID,ID int") {
+		t.Fatalf("missing compact member row:\n%s", got)
+	}
+	if !strings.Contains(got, "sig[1]{file,line,signature}:") {
+		t.Fatalf("missing signature table:\n%s", got)
 	}
 }
